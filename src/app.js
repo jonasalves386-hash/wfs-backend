@@ -6,7 +6,9 @@ const app = express();
 
 // ─── CORS ────────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL,   // https://projeto-0nqla.vercel.app (definida no Render)
+  process.env.FRONTEND_URL,
+  'https://project-0nqla.vercel.app',       // Vercel
+  'https://jonasalves386-hash.github.io',    // GitHub Pages
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'http://localhost:3000',
