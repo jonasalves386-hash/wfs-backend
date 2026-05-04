@@ -36,12 +36,16 @@ function minutosDesdeHorario(horario) {
   return Math.round((agora - alvo) / 60000);
 }
 
-function estaNaJanelaOperacional(horario) {
+function estaNaJanelaOperacional(horario, calco) {
   const tempo = minutosAteHorario(horario);
 
   if (tempo === null || tempo === undefined) return false;
 
-  return tempo >= -60 && tempo <= 60;
+  if (tempo > 60) return false;   // too far ahead, skip
+  if (tempo >= -60) return true;  // within normal window
+
+  // past the -60 min mark: keep only if no CALCO (delayed, not yet landed)
+  return !calco;
 }
 
 function deveRemoverPorCalco(calco) {
@@ -148,7 +152,7 @@ async function getVoos() {
 
       return true;
     })
-    .filter(v => estaNaJanelaOperacional(v.horario))
+    .filter(v => estaNaJanelaOperacional(v.horario, v.calco))
     .filter(v => !deveRemoverPorCalco(v.calco))
     .sort((a, b) => {
       const tempoA = minutosAteHorario(a.horario) ?? 9999;
