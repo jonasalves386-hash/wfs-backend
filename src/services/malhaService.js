@@ -24,24 +24,24 @@ function montarUrl() {
   return `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
 }
 
+// Delegates to minutosAteHorario (already timezone-aware for America/Sao_Paulo)
+// so there is no separate timezone logic to maintain here.
 function minutosDesdeHorario(horario) {
-  if (!isHorarioValido(horario)) return null;
-
-  const [h, m] = horario.split(':').map(Number);
-  const agora = new Date();
-  const alvo = new Date();
-
-  alvo.setHours(h, m, 0, 0);
-
-  return Math.round((agora - alvo) / 60000);
+  const ate = minutosAteHorario(horario);
+  return ate === null ? null : -ate;
 }
 
-function estaNaJanelaOperacional(horario) {
+function estaNaJanelaOperacional(horario, calco) {
   const tempo = minutosAteHorario(horario);
 
   if (tempo === null || tempo === undefined) return false;
 
-  return tempo >= -60 && tempo <= 60;
+  if (tempo > 60) return false;         // too far in the future
+  if (tempo >= -60) return true;        // within normal window
+
+  // Past -60 min: keep only if CALCO is filled (rule 5 — deveRemoverPorCalco handles the 2-min cutoff)
+  // If CALCO is empty the flight is past its window and should leave (rule 4)
+  return isHorarioValido(calco);
 }
 
 function deveRemoverPorCalco(calco) {
@@ -106,8 +106,8 @@ async function getVoos() {
     'PROCEDENCIA',
     'AEROPORTO ORIGEM'
   );
-  const idxHorario = findCol('ETA');
-  const idxCalco = findCol('CALCO', 'CALÇO', 'POUSO', 'ON BLOCK', 'ONBLOCK');
+  const idxHorario = findCol('ETA', 'STA', 'HORARIO', 'HORA', 'CHEGADA', 'ARRIVAL');
+  const idxCalco = findCol('CALCO', 'CALÇO', 'POUSO', 'ATD', 'ON BLOCK', 'ONBLOCK');
 
   console.log('[getVoos] Mapeamento:', {
     idxData,
