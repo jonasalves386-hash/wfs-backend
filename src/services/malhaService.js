@@ -36,16 +36,12 @@ function minutosDesdeHorario(horario) {
   return Math.round((agora - alvo) / 60000);
 }
 
-function estaNaJanelaOperacional(horario, calco) {
+function estaNaJanelaOperacional(horario) {
   const tempo = minutosAteHorario(horario);
 
   if (tempo === null || tempo === undefined) return false;
 
-  if (tempo > 60) return false;   // too far ahead, skip
-  if (tempo >= -60) return true;  // within normal window
-
-  // past the -60 min mark: keep only if no CALCO (delayed, not yet landed)
-  return !calco;
+  return tempo >= -60 && tempo <= 60;
 }
 
 function deveRemoverPorCalco(calco) {
@@ -110,8 +106,8 @@ async function getVoos() {
     'PROCEDENCIA',
     'AEROPORTO ORIGEM'
   );
-  const idxHorario = findCol('STA', 'ETA', 'HORARIO', 'HORA', 'CHEGADA', 'ARRIVAL');
-  const idxCalco = findCol('CALCO', 'CALÇO', 'POUSO', 'ATD', 'ON BLOCK', 'ONBLOCK');
+  const idxHorario = findCol('ETA');
+  const idxCalco = findCol('CALCO', 'CALÇO', 'POUSO', 'ON BLOCK', 'ONBLOCK');
 
   console.log('[getVoos] Mapeamento:', {
     idxData,
