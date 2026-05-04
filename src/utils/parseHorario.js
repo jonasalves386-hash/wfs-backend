@@ -50,12 +50,15 @@ function isHoje(data) {
   if (!isDataValida(data)) return false;
 
   const [dia, mes, ano] = data.trim().split('/').map(Number);
-  const hoje = new Date();
+
+  const hojeBR = new Date(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
+  );
 
   return (
-    dia === hoje.getDate() &&
-    mes === hoje.getMonth() + 1 &&
-    ano === hoje.getFullYear()
+    dia === hojeBR.getDate() &&
+    mes === hojeBR.getMonth() + 1 &&
+    ano === hojeBR.getFullYear()
   );
 }
 
@@ -66,22 +69,24 @@ function isHoje(data) {
  * @param {string} horario - formato HH:mm
  * @returns {number} minutos (pode ser negativo)
  */
+function getAgoraBR() {
+  const agora = new Date();
+  const offset = -3; // Brasil UTC-3
+  const utc = agora.getTime() + (agora.getTimezoneOffset() * 60000);
+  return new Date(utc + (3600000 * offset));
+}
+
 function minutosAteHorario(horario) {
   if (!isHorarioValido(horario)) return null;
 
-const [h, m] = horario.trim().split(':').map(Number);
+  const [h, m] = horario.trim().split(':').map(Number);
 
-const agora = new Date();
-const alvo = new Date();
+  const agoraBR = getAgoraBR();
+  const alvo = new Date(agoraBR);
 
-alvo.setHours(h, m, 0, 0);
+  alvo.setHours(h, m, 0, 0);
 
-// se o horário já passou muito (ex: mais de 12h atrás), assume próximo dia
-if (alvo < agora && (agora - alvo) > 12 * 60 * 60 * 1000) {
-  alvo.setDate(alvo.getDate() + 1);
-}
-
-  return Math.floor((alvo - agora) / 60000);
+  return Math.floor((alvo - agoraBR) / 60000);
 }
 
 module.exports = {
