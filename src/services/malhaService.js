@@ -54,13 +54,6 @@ async function getLimpeza() {
   }));
 }
 
-// Delegates to minutosAteHorario (already timezone-aware for America/Sao_Paulo)
-// so there is no separate timezone logic to maintain here.
-function minutosDesdeHorario(horario) {
-  const ate = minutosAteHorario(horario);
-  return ate === null ? null : -ate;
-}
-
 function estaNaJanelaOperacional(horario, calco) {
   const tempo = minutosAteHorario(horario);
 
@@ -69,20 +62,10 @@ function estaNaJanelaOperacional(horario, calco) {
   if (tempo > 60) return false;         // too far in the future
   if (tempo >= -60) return true;        // within normal window
 
-  // Past -60 min: keep only if CALCO is filled (rule 5 — deveRemoverPorCalco handles the 2-min cutoff)
-  // If CALCO is empty the flight is past its window and should leave (rule 4)
+  // Past -60 min: keep only if CALCO is filled (flight already landed but still within view)
   return isHorarioValido(calco);
 }
 
-function deveRemoverPorCalco(calco) {
-  if (!isHorarioValido(calco)) return false;
-
-  const minutos = minutosDesdeHorario(calco);
-
-  if (minutos === null) return false;
-
-  return minutos >= 2;
-}
 
 async function getVoos() {
   const url = montarUrl();
@@ -192,7 +175,6 @@ async function getVoos() {
       return true;
     })
     .filter(v => estaNaJanelaOperacional(v.horario, v.calco))
-    .filter(v => !deveRemoverPorCalco(v.calco))
     .sort((a, b) => {
       const tempoA = minutosAteHorario(a.horario) ?? 9999;
       const tempoB = minutosAteHorario(b.horario) ?? 9999;
