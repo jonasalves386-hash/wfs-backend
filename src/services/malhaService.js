@@ -155,7 +155,7 @@ async function getVoos() {
       const tempoB = minutosAteHorario(b.horario) ?? 9999;
       return tempoA - tempoB;
     })
-    .slice(0, 25)
+    .slice(0, 15)
     .map(v => ({
       voo: v.voo,
       origem: v.origem,
