@@ -61,17 +61,17 @@ function minutosDesdeHorario(horario) {
   return ate === null ? null : -ate;
 }
 
-function estaNaJanelaOperacional(horario, calco) {
+function estaNaJanelaOperacional(horario) {
   const tempo = minutosAteHorario(horario);
 
   if (tempo === null || tempo === undefined) return false;
 
-  if (tempo > 60) return false;         // too far in the future
-  if (tempo >= -60) return true;        // within normal window
+  // Futuro muito distante ainda não entra
+  if (tempo > 60) return false;
 
-  // Past -60 min: keep only if CALCO is filled (rule 5 — deveRemoverPorCalco handles the 2-min cutoff)
-  // If CALCO is empty the flight is past its window and should leave (rule 4)
-  return isHorarioValido(calco);
+  // Se está dentro de +60 ou já passou, mantém.
+  // A saída agora será pela limpeza escalada + ETA zerado.
+  return true;
 }
 
 function deveRemoverPorCalco(calco) {
@@ -190,31 +190,40 @@ async function getVoos() {
 
       return true;
     })
-    .filter(v => estaNaJanelaOperacional(v.horario, v.calco))
-    .filter(v => !deveRemoverPorCalco(v.calco))
-    .sort((a, b) => {
-      const tempoA = minutosAteHorario(a.horario) ?? 9999;
-      const tempoB = minutosAteHorario(b.horario) ?? 9999;
-      return tempoA - tempoB;
-    })
-    .slice(0, 15)
-    .map(v => {
-      const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
-      const valorLimpeza = limpezaMap.get(chave) ?? '';
-      return {
-        voo: v.voo,
-        origem: v.origem,
-        horario: v.horario,
-        calco: v.calco,
-        tempo: v.tempo,
-        servicos: {
-          limpeza: {
-            escalado: limpezaEstaEscalada(valorLimpeza),
-            valor: valorLimpeza,
-          },
-        },
-      };
-    });
+    .filter(v => estaNaJanelaOperacional(v.horario))
+.sort((a, b) => {
+  const tempoA = minutosAteHorario(a.horario) ?? 9999;
+  const tempoB = minutosAteHorario(b.horario) ?? 9999;
+  return tempoA - tempoB;
+})
+.map(v => {
+  const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
+  const valorLimpeza = limpezaMap.get(chave) ?? '';
+  const limpezaEscalada = limpezaEstaEscalada(valorLimpeza);
+
+  return {
+    voo: v.voo,
+    origem: v.origem,
+    horario: v.horario,
+    calco: v.calco,
+    data: v.data,
+    tempo: v.tempo,
+    servicos: {
+      limpeza: {
+        escalado: limpezaEscalada,
+        valor: valorLimpeza,
+      },
+    },
+  };
+})
+.filter(v => {
+  const tempo = minutosAteHorario(v.horario);
+
+  if (tempo === null || tempo === undefined) return true;
+
+  return !(v.servicos.limpeza.escalado && tempo <= 0);
+})
+.slice(0, 15);
 
   console.log('[getVoos] Total voos PROG (após filtro):', voos.length);
   console.log('[getVoos] Total linhas LIMPEZA:', limpeza.length);
