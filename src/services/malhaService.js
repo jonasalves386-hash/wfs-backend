@@ -23,7 +23,7 @@ async function getLimpeza() {
   if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
 
   const sheetId = '17ggPnOyf-xzDX8WWgGhKGyf0fkwiCvmWZhLbYEup8Eo';
-  const range = encodeURIComponent('NARROW') + '!A:G';
+  const range = encodeURIComponent('NARROW') + '!A:Q';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
 
   const { data } = await axios.get(url, {
@@ -38,7 +38,24 @@ async function getLimpeza() {
     voo:    String(row[1] || '').trim(), // B = VOO
     ori:    String(row[2] || '').trim(), // C = ORI
     equipe: String(row[6] || '').trim(), // G = EQUIPE LIMPEZA
+    qta1:   String(row[9] || '').trim(),
+    qta2:   String(row[10] || '').trim(),
+    qtu1:   String(row[15] || '').trim(),
+    qtu2:   String(row[16] || '').trim(),
   }));
+}
+
+function temNomeValido(valor) {
+  const texto = String(valor || '').trim();
+
+  if (!texto) return false;
+  if (['-', 'OK', 'N/A', 'NA'].includes(texto.toUpperCase())) return false;
+
+  return /[A-Za-zÀ-ÿ]{2,}/.test(texto);
+}
+
+function duplaEscalada(a, b) {
+  return temNomeValido(a) && temNomeValido(b);
 }
 
 function montarUrl() {
@@ -103,7 +120,7 @@ async function getVoos() {
   const limpezaMap = new Map();
   for (const linha of limpeza) {
     const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
-    limpezaMap.set(chave, linha.equipe);
+    limpezaMap.set(chave, linha);
   }
 
   const rows = data.values;
@@ -198,7 +215,10 @@ async function getVoos() {
 })
 .map(v => {
   const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
-  const valorLimpeza = limpezaMap.get(chave) ?? '';
+
+  const linhaServico = limpezaMap.get(chave);
+
+  const valorLimpeza = linhaServico?.equipe ?? '';
   const limpezaEscalada = limpezaEstaEscalada(valorLimpeza);
 
   return {
@@ -213,9 +233,18 @@ async function getVoos() {
         escalado: limpezaEscalada,
         valor: valorLimpeza,
       },
+      qta: {
+        escalado: duplaEscalada(linhaServico?.qta1, linhaServico?.qta2),
+        valor: `${linhaServico?.qta1 || ''} | ${linhaServico?.qta2 || ''}`.trim(),
+      },
+      qtu: {
+        escalado: duplaEscalada(linhaServico?.qtu1, linhaServico?.qtu2),
+        valor: `${linhaServico?.qtu1 || ''} | ${linhaServico?.qtu2 || ''}`.trim(),
+      },
     },
   };
 })
+
 .filter(v => {
   const tempo = minutosAteHorario(v.horario);
 
