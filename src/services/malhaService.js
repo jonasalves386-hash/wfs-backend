@@ -58,6 +58,55 @@ function duplaEscalada(a, b) {
   return temNomeValido(a) && temNomeValido(b);
 }
 
+const FONIA_EQUIPES_VALIDAS_RAW = [
+'ALFA - T1', 'ALFA-T2', 'ALFA-T3', 'ALFA -T4', 'BETA - T1', 'BETA-T2', 'BETA- T3', 'BETA- T4', 'BLUE-T1', 'BLUE-T2', 'BLUE-T3', 'BLUE-T4', 'BRAVO - T1', 'BRAVO - T2',
+'BRAVO - T3', 'BRAVO - T4', 'BRONZE- T2', 'BRONZE- T3', 'CHARLIE - T1', 'CHARLIE- T2', 'CHARLIE - T3', 'CHARLIE - T4', 'DELTA - T1', 'DELTA - T2', 'DELTA - T3', 'DELTA - T4',
+'DIAMANTE- T1', 'DIAMANTE - T2', 'DIAMANTE - T3', 'DIAMANTE - T4', 'ECHO-T1', 'ECHO-T2', 'ECHO-T3', 'ECHO-T4', 'ELITE - T2', 'FENIX - T2', 'FERRARI - T2', 'FOXTROT -T1',
+'FOXTROT-T2', 'FOXTROT -T3', 'FOXTROT- T4', 'GOLDEN-T1', 'GOLDEN-T2', 'GOLDEN-T3', 'GOLDEN-T4', 'GOLF-T1', 'GOLF-T2', 'GOLF-T3', 'GOLF- T4', 'HOTEL-T1', 'HOTEL-T2', 'HOTEL-T3',
+'HOTEL-T4', 'INDIA - T1', 'INDIA - T2', 'INDIA - T3', 'INDIA - T4', 'JULIET - T1', 'JULIET - T2', 'JULIET-T3', 'JULIET- T4', 'KILO- T1', 'KILO- T2', 'KILO- T3', 'KILO- T4',
+'LIMA -T1', 'LIMA - T2', 'LIMA - T3', 'LIMA - T4', 'MIKE - T1', 'MIKE - T2', 'MIKE - T3', 'MIKE - T4', 'NOVEMBER-T2', 'NOVEMBER-T3', 'NOVEMBER-T4', 'OSCAR-T1', 'OSCAR-T2',
+'OSCAR-T3', 'OSCAR- T4', 'PAPA - T1', 'PAPA - T2', 'PAPA - T3', 'PAPA - T4', 'PRATA- T3', 'QUEBEC-T1', 'QUEBEC-T2', 'QUEBEC-T3', 'QUEBEC-T4', 'RED-T1', 'RED-T2', 'RED-T3',
+'RED-T4', 'ROMA-T1', 'ROMA-T2', 'ROMA-T3', 'ROMA-T4', 'ROMEO- T1', 'ROMEO - T2', 'ROMEO-T3', 'ROMEO - T4', 'SIERRA - T1', 'SIERRA - T2', 'SIERRA - T3', 'SIERRA - T4',
+'SILVER-T1', 'SILVER-T2', 'SILVER-T3', 'SILVER-T4', 'TANGO - T1', 'TANGO - T2', 'TANGO - T3', 'TANGO- T4', 'TITANIUM- T2', 'TITANIUM- T3', 'UNIFORM- T1', 'UNIFORM - T2',
+'UNIFORM - T3', 'UNIFORM - T4', 'VICTOR- T1', 'VICTOR - T2', 'VICTOR- T3', 'VICTOR - T4', 'WHISKEY - T1', 'WHISKEY -T2', 'WHISKEY - T3', 'WHISKEY - T4', 'X RAY - T1', 'X RAY -T2',
+'X RAY-T3', 'X RAY- T4', 'XADREZ-T3', 'XADREZ - T4', 'YANKEE-T1', 'YANKEE - T2', 'YANKEE-T3', 'YANKEE - T4', 'YELLOW-T1', 'YELLOW- T2', 'YELLOW- T3', 'YELLOW- T4', 'ZULU - T1',
+'ZULU- T2', 'ZULU- T3', 'ZULU - T4', 'ELITE - T3', 'TRASLADO', 'ELITE -T4', 'FENIX - T3', 'FENIX - T4', 'TITANIUM- T4', 'BRONZE - T4', 'PRATA- T4','APOIO - T1', 'APOIO - T2',
+'APOIO - T3', 'APOIO - T4',
+];
+
+function normalizarEquipeFonia(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\bAPOIO\s+T([1-4])\b/g, 'APOIO-T$1')
+    .replace(/\s+/g, ' ');
+}
+
+const FONIA_EQUIPES_VALIDAS = new Set(
+  FONIA_EQUIPES_VALIDAS_RAW.map(normalizarEquipeFonia)
+);
+
+function ehApoioValidoFonia(valor) {
+  const texto = normalizarEquipeFonia(valor);
+
+  return /^APOIO-T[1-4](\s+.*)?$/.test(texto);
+}
+
+function foniaEstaEscalada(a, b) {
+  const valorA = normalizarEquipeFonia(a);
+  const valorB = normalizarEquipeFonia(b);
+
+  return (
+    FONIA_EQUIPES_VALIDAS.has(valorA) ||
+    FONIA_EQUIPES_VALIDAS.has(valorB) ||
+    ehApoioValidoFonia(a) ||
+    ehApoioValidoFonia(b)
+  );
+}
+
 function montarUrl() {
   const sheetId = process.env.GOOGLE_SHEET_ID;
   const sheetName = process.env.SHEET_NAME;
@@ -83,12 +132,7 @@ function estaNaJanelaOperacional(horario) {
 
   if (tempo === null || tempo === undefined) return false;
 
-  // Futuro muito distante ainda não entra
-  if (tempo > 60) return false;
-
-  // Se está dentro de +60 ou já passou, mantém.
-  // A saída agora será pela limpeza escalada + ETA zerado.
-  return true;
+  return tempo >= -60 && tempo <= 60;
 }
 
 function deveRemoverPorCalco(calco) {
@@ -181,65 +225,74 @@ async function getVoos() {
     throw new Error(`Colunas obrigatórias não encontradas. Headers disponíveis: ${headersOriginais.join(', ')}`);
   }
 
-  const voos = rows.slice(1)
-    .map(row => {
-      const voo = String(row[idxVoo] || '').trim();
-      const origem = idxOrigem >= 0 ? String(row[idxOrigem] || '').trim() : '';
-      const horario = String(row[idxHorario] || '').trim();
-      const calcoBruto = idxCalco >= 0 ? String(row[idxCalco] || '').trim() : '';
-      const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
+const voos = rows.slice(1)
+  .map(row => {
+    const voo = String(row[idxVoo] || '').trim();
+    const origem = idxOrigem >= 0 ? String(row[idxOrigem] || '').trim() : '';
+    const horario = String(row[idxHorario] || '').trim();
+    const calcoBruto = idxCalco >= 0 ? String(row[idxCalco] || '').trim() : '';
+    const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
 
-      return {
-        voo,
-        origem,
-        horario,
-        calco: isHorarioValido(calcoBruto) ? calcoBruto : null,
-        data: dataLinha,
-        tempo: minutosAteHorario(horario) ?? 0,
-      };
-    })
-    .filter(v => v.voo)
-    .filter(v => isHorarioValido(v.horario))
-    .filter(v => {
-      if (idxData >= 0) {
-        return isDataValida(v.data) && isHoje(v.data);
-      }
+    const fonia1 = String(row[12] || '').trim();
+    const fonia2 = String(row[13] || '').trim();
 
-      return true;
-    })
-    .filter(v => estaNaJanelaOperacional(v.horario))
-.sort((a, b) => {
+    return {
+      voo,
+      origem,
+      horario,
+      calco: isHorarioValido(calcoBruto) ? calcoBruto : null,
+      data: dataLinha,
+      tempo: minutosAteHorario(horario) ?? 0,
+      fonia1,
+      fonia2,
+    };
+  })
+  .filter(v => v.voo)
+  .filter(v => isHorarioValido(v.horario))
+  .filter(v => {
+    if (idxData >= 0) {
+      return isDataValida(v.data) && isHoje(v.data);
+    }
+
+    return true;
+  })
+  .filter(v => estaNaJanelaOperacional(v.horario))
+
+  .sort((a, b) => {
   const tempoA = minutosAteHorario(a.horario) ?? 9999;
   const tempoB = minutosAteHorario(b.horario) ?? 9999;
   return tempoA - tempoB;
-})
+  })
+
 .map(v => {
   const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
-
   const linhaServico = limpezaMap.get(chave);
-
   const valorLimpeza = linhaServico?.equipe ?? '';
   const limpezaEscalada = limpezaEstaEscalada(valorLimpeza);
 
   return {
-    voo: v.voo,
-    origem: v.origem,
-    horario: v.horario,
-    calco: v.calco,
-    data: v.data,
-    tempo: v.tempo,
-    servicos: {
-      limpeza: {
-        escalado: limpezaEscalada,
-        valor: valorLimpeza,
+      voo: v.voo,
+      origem: v.origem,
+      horario: v.horario,
+      calco: v.calco,
+      data: v.data,
+      tempo: v.tempo,
+      servicos: {
+    limpeza: {
+    escalado: limpezaEscalada,
+    valor: valorLimpeza,
       },
-      qta: {
-        escalado: duplaEscalada(linhaServico?.qta1, linhaServico?.qta2),
-        valor: `${linhaServico?.qta1 || ''} | ${linhaServico?.qta2 || ''}`.trim(),
+    fonia: {
+    escalado: foniaEstaEscalada(v.fonia1, v.fonia2),
+    valor: `${v.fonia1 || ''} | ${v.fonia2 || ''}`.trim(),
       },
-      qtu: {
-        escalado: duplaEscalada(linhaServico?.qtu1, linhaServico?.qtu2),
-        valor: `${linhaServico?.qtu1 || ''} | ${linhaServico?.qtu2 || ''}`.trim(),
+    qta: {
+    escalado: duplaEscalada(linhaServico?.qta1, linhaServico?.qta2),
+    valor: `${linhaServico?.qta1 || ''} | ${linhaServico?.qta2 || ''}`.trim(),
+      },
+    qtu: {
+    escalado: duplaEscalada(linhaServico?.qtu1, linhaServico?.qtu2),
+    valor: `${linhaServico?.qtu1 || ''} | ${linhaServico?.qtu2 || ''}`.trim(),
       },
     },
   };
@@ -250,7 +303,11 @@ async function getVoos() {
 
   if (tempo === null || tempo === undefined) return true;
 
-  return !(v.servicos.limpeza.escalado && tempo <= 0);
+  return !(
+  tempo <= 0 &&
+  v.servicos.limpeza.escalado &&
+  v.servicos.fonia.escalado
+  );
 })
 .slice(0, 15);
 
