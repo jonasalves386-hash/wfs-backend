@@ -45,6 +45,56 @@ async function getLimpeza() {
   }));
 }
 
+async function getSmartFuel() {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
+
+  const sheetId = '1OYyGTUYqlaQvp0xWZ9Bys-8EmxFf12CEjbuPb8E0F-w';
+  const range = encodeURIComponent('SMART FUEL') + '!B:AM';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+
+  const { data } = await axios.get(url, {
+    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+  });
+
+  const rows = data.values;
+  if (!rows || rows.length < 2) return [];
+
+  const resultado = rows.slice(1).map(row => ({
+    data:   String(row[0] || '').trim(),
+    voo:    String(row[1] || '').trim(),
+    ori:    String(row[2] || '').trim(),
+    equipe: String(row[37] || '').trim(),
+  }));
+
+  return resultado;
+}
+
+function smartFuelEstaEscalado(valor) {
+  const texto = normalizarOperadorSmartFuel(valor);
+
+  if (!texto) return false;
+
+  for (const operador of SMART_FUEL_OPERADORES_VALIDOS) {
+    if (texto.includes(operador) || operador.includes(texto)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function normalizarOperadorSmartFuel(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+T([1-4])\b/g, '-T$1')
+    .replace(/\s+/g, ' ');
+}
+
 function temNomeValido(valor) {
   const texto = String(valor || '').trim();
 
@@ -107,6 +157,44 @@ function foniaEstaEscalada(a, b) {
   );
 }
 
+const SMART_FUEL_OPERADORES_VALIDOS_RAW = ['CARLOS ALBERTO DA SILVA REZENDE - T1', 'DIHONE ASSUNÇÃO DOS SANTOS  - T1', 'EMERSON DAVILA FERREIRA DUARTE - T1',
+  'GABRIEL DE LIMA ALVES - T1', 'RENATO BEZERRA PAULINO - T1', 'SAMUEL FRANÇA DOS SANTOS - T1', 'UBERLAN SANTOS DE OLIVEIRA - T1', 'VALDEMIR VIERA DOS SANTOS - T1',
+  'NAILTON RAMOS DOS SANTOS - T1', 'EVANDRO ROBERIO SOARES PEREIRA - T1', 'VICENT DENIS OLIVEIRA DA COSTA - T1', 'ANDERSON JUSTINO DA SILVA - T1', 'PAULO LUCAS DE SOUZA - T1',
+  'ADELINO ROBERTO F. JUNIOR - T2', 'ANDERSON DOS SANTOS - T2', 'CARLOS HENRIQUE COELHO DE ALMEIDA - T2', 'CLAUDECIR DOS SANTOS CARDOSO - T2', 'CLAUDEMIR BARBOSA DA CONCEICAO - T2',
+  'DANIEL SILVESTRE - T2', 'DAYVID DJALMA DA SILVA - T2', 'DELMARX SOARES OLIVEIRA - T2', 'ERIK GOMES DA SILVA - T2', 'ESMERALDO FERNANDES DOS SANTOS - T2',
+  'IVAN LUCAS DA SILVA - T2', 'JAILSON CORDEIRO DA SILVA - T2', 'JOANILSON SILVA TEXEIRA - T2', 'JOSIVALDO SILVA DE OLIVEIRA - T2', 'LEONARDO CIRINO MORAIS - T2',
+  'MARCELO ELIAS RIBEIRO MOREIRA - T2', 'RICARDO DO NASCIMENTO-T2', 'SILVANO CARLOS MUNARIM - T2', 'MIGUEL PAIXÃO DA SILVA - T2', 'HAMILTON SOARES DE ARAUJO FILHO - T2',
+  'VAGNER DA SILVA NEGRONI - T2', 'ELISÂNIO SOUZA - T2', 'WESLEY ALVES ARAUJO - T2', 'ALEXANDRE - T3', 'ANDERSON DE LOURDES - T3', 'EDVALDO - T3', 'EILSON DE ABREU BORGES - T3',
+  'EMERSON - T3', 'GABRIEL RODRIGUES MARQUES - T3', 'JEFFERSON COSTA - T3', 'JEFFERSON DOS SANTOS VENTURA - T3', 'JESIEL DA SILVA RODRIGUES - T3', 'JONAS HENRIQUE SANTOS LIMA - T3',
+  'JONAS DIOGO OLIVEIRA DE ALMEIDA - T3', 'MARCELO NASCIMENTO DE OLIVEIRA - T3', 'MARCOS - T3', 'MARTA - T3', 'PAULO MENDONCA DE OLIVEIRA SANTOS - T3', 'REGINALDO NASCIMENTO AVELINO - T3',
+  'REYKJAVIK SOUZA AGUIAR - T3', 'RICARDO HENRIQUE OLIVEIRA DA SILVA - T3', 'ROLEMBERG RIBEIRO DE OLIVEIRA - T3', 'VANDERSON - T3', 'AFONSO - T4', 'ANTONIO - T4', 'BRENO - T4',
+  'CARLOS - T4', 'DANIEL - T4', 'EDSON - T4', 'EDUARDO ROQUE - T4', 'JONATAN - T4', 'JOSE - T4', 'LEANDRO - T4', 'LUAN - T4', 'LUIZ - T4', 'MARCIO MANUEL - T4', 'MARCOS ROCHA - T4', 'MAURO - T4',
+  'PETER - T4', 'REGIO - T4', 'RODRIGO - T4', 'SANDRO - T4', 'VALMIR - T4', 'JILSON XAVIER - T4', 'WESLEY MARCIANO ISIDORO - T3', 'JOÃO CARLOS - T4', 'MAURICIO COSTA - T3', 'MARCELO - T4',
+  'MARCIO GOMES -T3', 'LUIS PACHECO - T3', 'ALCIDES PEREIRA VIANA - T4', 'REMERSON SOARES - T4', 'LEONARDO AUX  - ', 'RICARDO AUX - ', 'WILLIAN - T3', 'JOEL  - T4', 'ALEX  - T3',
+  'LEANDRO - T3'];
+
+function normalizarOperadorSmartFuel(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, ' ');
+}
+
+const SMART_FUEL_OPERADORES_VALIDOS = new Set(
+  SMART_FUEL_OPERADORES_VALIDOS_RAW.map(normalizarOperadorSmartFuel)
+);
+
+function smartFuelEstaEscalado(valor) {
+  const texto = String(valor || '').trim();
+
+  console.log('[SMART FUEL VALOR]', texto);
+
+  return texto.length > 0;
+}
+
 function montarUrl() {
   const sheetId = process.env.GOOGLE_SHEET_ID;
   const sheetName = process.env.SHEET_NAME;
@@ -148,10 +236,11 @@ function deveRemoverPorCalco(calco) {
 async function getVoos() {
   const url = montarUrl();
 
-  const [progResult, limpezaResult] = await Promise.allSettled([
-    axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
-    getLimpeza(),
-  ]);
+const [progResult, limpezaResult, smartFuelResult] = await Promise.allSettled([
+  axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
+  getLimpeza(),
+  getSmartFuel(),
+]);
 
   if (progResult.status === 'rejected') throw progResult.reason;
   const { data } = progResult.value;
@@ -161,11 +250,24 @@ async function getVoos() {
     console.warn('[getVoos] Falha ao buscar LIMPEZA, continuando sem ela:', limpezaResult.reason?.message);
   }
 
+  const smartFuel = smartFuelResult.status === 'fulfilled' ? smartFuelResult.value : [];
+if (smartFuelResult.status === 'rejected') {
+  console.warn('[getVoos] Falha ao buscar SMART FUEL, continuando sem ele:', smartFuelResult.reason?.message);
+}
+
   const limpezaMap = new Map();
+
   for (const linha of limpeza) {
     const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
     limpezaMap.set(chave, linha);
   }
+
+const smartFuelMap = new Map();
+
+for (const linha of smartFuel) {
+  const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
+  smartFuelMap.set(chave, linha);
+}
 
   const rows = data.values;
 
@@ -266,33 +368,40 @@ const voos = rows.slice(1)
 
 .map(v => {
   const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
+  const chaveSmartFuel = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}`;
   const linhaServico = limpezaMap.get(chave);
+  const linhaSmartFuel = smartFuelMap.get(chaveSmartFuel);
   const valorLimpeza = linhaServico?.equipe ?? '';
+  const valorSmartFuel = linhaSmartFuel?.equipe ?? '';
   const limpezaEscalada = limpezaEstaEscalada(valorLimpeza);
 
   return {
-      voo: v.voo,
-      origem: v.origem,
-      horario: v.horario,
-      calco: v.calco,
-      data: v.data,
-      tempo: v.tempo,
-      servicos: {
-    limpeza: {
-    escalado: limpezaEscalada,
-    valor: valorLimpeza,
+    voo: v.voo,
+    origem: v.origem,
+    horario: v.horario,
+    calco: v.calco,
+    data: v.data,
+    tempo: v.tempo,
+    servicos: {
+      limpeza: {
+        escalado: limpezaEscalada,
+        valor: valorLimpeza,
       },
-    fonia: {
-    escalado: foniaEstaEscalada(v.fonia1, v.fonia2),
-    valor: `${v.fonia1 || ''} | ${v.fonia2 || ''}`.trim(),
+      fonia: {
+        escalado: foniaEstaEscalada(v.fonia1, v.fonia2),
+        valor: `${v.fonia1 || ''} | ${v.fonia2 || ''}`.trim(),
       },
-    qta: {
-    escalado: duplaEscalada(linhaServico?.qta1, linhaServico?.qta2),
-    valor: `${linhaServico?.qta1 || ''} | ${linhaServico?.qta2 || ''}`.trim(),
+      qta: {
+        escalado: duplaEscalada(linhaServico?.qta1, linhaServico?.qta2),
+        valor: `${linhaServico?.qta1 || ''} | ${linhaServico?.qta2 || ''}`.trim(),
       },
-    qtu: {
-    escalado: duplaEscalada(linhaServico?.qtu1, linhaServico?.qtu2),
-    valor: `${linhaServico?.qtu1 || ''} | ${linhaServico?.qtu2 || ''}`.trim(),
+      qtu: {
+        escalado: duplaEscalada(linhaServico?.qtu1, linhaServico?.qtu2),
+        valor: `${linhaServico?.qtu1 || ''} | ${linhaServico?.qtu2 || ''}`.trim(),
+      },
+      smartfuel: {
+        escalado: smartFuelEstaEscalado(valorSmartFuel),
+        valor: valorSmartFuel,
       },
     },
   };
