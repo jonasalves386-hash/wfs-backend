@@ -145,15 +145,52 @@ function ehApoioValidoFonia(valor) {
   return /^APOIO-T[1-4](\s+.*)?$/.test(texto);
 }
 
-function foniaEstaEscalada(a, b) {
-  const valorA = normalizarEquipeFonia(a);
-  const valorB = normalizarEquipeFonia(b);
+function contemEquipeValidaFonia(valor) {
+  const texto = normalizarEquipeFonia(valor);
 
+  if (!texto) return false;
+
+  for (const equipe of FONIA_EQUIPES_VALIDAS) {
+    if (texto.includes(equipe)) {
+      return true;
+    }
+  }
+
+  return /(^|\s)APOIO-T[1-4](\s|$)/.test(texto);
+}
+
+function contemEquipeValidaFonia(valor) {
+  const texto = normalizarEquipeFonia(valor);
+
+  if (!texto) return false;
+
+  for (const equipe of FONIA_EQUIPES_VALIDAS) {
+    if (texto.includes(equipe)) {
+      return true;
+    }
+  }
+
+  return /(^|\s)APOIO-T[1-4](\s|$)/.test(texto);
+}
+
+function contemEquipeValidaFonia(valor) {
+  const texto = normalizarEquipeFonia(valor);
+
+  if (!texto) return false;
+
+  for (const equipe of FONIA_EQUIPES_VALIDAS) {
+    if (texto.includes(equipe)) {
+      return true;
+    }
+  }
+
+  return /(^|\s)APOIO-T[1-4](\s|$)/.test(texto);
+}
+
+function foniaEstaEscalada(a, b) {
   return (
-    FONIA_EQUIPES_VALIDAS.has(valorA) ||
-    FONIA_EQUIPES_VALIDAS.has(valorB) ||
-    ehApoioValidoFonia(a) ||
-    ehApoioValidoFonia(b)
+    contemEquipeValidaFonia(a) ||
+    contemEquipeValidaFonia(b)
   );
 }
 
