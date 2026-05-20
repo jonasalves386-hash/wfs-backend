@@ -11,6 +11,12 @@ function normalizarTexto(valor) {
     .replace(/\s+/g, ' ');
 }
 
+function extrairHorario(valor) {
+  const texto = String(valor || '').trim();
+  const match = texto.match(/([01]\d|2[0-3]):[0-5]\d/);
+  return match ? match[0] : '';
+}
+
 // Válido: pelo menos um par HH:MM + NOME ou NOME + HH:MM (nome = 2+ letras consecutivas)
 function limpezaEstaEscalada(valor) {
   const texto = String(valor || '').trim();
@@ -69,6 +75,7 @@ async function getSmartFuel() {
 
   return resultado;
 }
+
 
 function smartFuelEstaEscalado(valor) {
   const texto = normalizarOperadorSmartFuel(valor);
@@ -159,34 +166,6 @@ function contemEquipeValidaFonia(valor) {
   return /(^|\s)APOIO-T[1-4](\s|$)/.test(texto);
 }
 
-function contemEquipeValidaFonia(valor) {
-  const texto = normalizarEquipeFonia(valor);
-
-  if (!texto) return false;
-
-  for (const equipe of FONIA_EQUIPES_VALIDAS) {
-    if (texto.includes(equipe)) {
-      return true;
-    }
-  }
-
-  return /(^|\s)APOIO-T[1-4](\s|$)/.test(texto);
-}
-
-function contemEquipeValidaFonia(valor) {
-  const texto = normalizarEquipeFonia(valor);
-
-  if (!texto) return false;
-
-  for (const equipe of FONIA_EQUIPES_VALIDAS) {
-    if (texto.includes(equipe)) {
-      return true;
-    }
-  }
-
-  return /(^|\s)APOIO-T[1-4](\s|$)/.test(texto);
-}
-
 function foniaEstaEscalada(a, b) {
   return (
     contemEquipeValidaFonia(a) ||
@@ -225,11 +204,17 @@ const SMART_FUEL_OPERADORES_VALIDOS = new Set(
 );
 
 function smartFuelEstaEscalado(valor) {
-  const texto = String(valor || '').trim();
+  const texto = normalizarOperadorSmartFuel(valor);
 
-  console.log('[SMART FUEL VALOR]', texto);
+  if (!texto) return false;
 
-  return texto.length > 0;
+  for (const operador of SMART_FUEL_OPERADORES_VALIDOS) {
+    if (texto.includes(operador) || operador.includes(texto)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function montarUrl() {
@@ -270,13 +255,37 @@ function deveRemoverPorCalco(calco) {
   return minutos >= 2;
 }
 
+async function getRestituicaoBag() {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
+
+  const sheetId = '11sPIGtgxFgMkb1aEOAWA_kdugs8rKfyFJFNYyCzpoHE';
+  const range = encodeURIComponent('OPERACAO_DIA') + '!A:Z';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+
+  const { data } = await axios.get(url, {
+    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+  });
+
+  const rows = data.values;
+  if (!rows || rows.length < 2) return [];
+
+  return rows.slice(1).map(row => ({
+    operador: String(row[15] || '').trim(), // P
+    confirmado: String(row[16] || '').trim().toUpperCase() === 'TRUE', // Q checkbox
+    chave: normalizarTexto(row[25] || ''), // Z = DATA+VOO
+  }));
+}
+
 async function getVoos() {
   const url = montarUrl();
 
-const [progResult, limpezaResult, smartFuelResult] = await Promise.allSettled([
+const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult] = await Promise.allSettled([
   axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getLimpeza(),
   getSmartFuel(),
+  getMonitorChegada(),
+  getRestituicaoBag(),
 ]);
 
   if (progResult.status === 'rejected') throw progResult.reason;
@@ -292,6 +301,25 @@ if (smartFuelResult.status === 'rejected') {
   console.warn('[getVoos] Falha ao buscar SMART FUEL, continuando sem ele:', smartFuelResult.reason?.message);
 }
 
+const monitorChegada = monitorResult.status === 'fulfilled' ? monitorResult.value : [];
+
+if (monitorResult.status === 'rejected') {
+  console.warn('[getVoos] Falha ao buscar MONITOR CHEGADA, usando ETA/CALÇO da PROG:', monitorResult.reason?.message);
+}
+
+const restituicao = restituicaoResult.status === 'fulfilled' ? restituicaoResult.value : [];
+
+if (restituicaoResult.status === 'rejected') {
+  console.warn('[getVoos] Falha ao buscar RESTITUIÇÃO BAG, continuando sem ela:', restituicaoResult.reason?.message);
+}
+
+const monitorMap = new Map();
+
+for (const linha of monitorChegada) {
+  const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
+  monitorMap.set(chave, linha);
+}
+
   const limpezaMap = new Map();
 
   for (const linha of limpeza) {
@@ -304,6 +332,14 @@ const smartFuelMap = new Map();
 for (const linha of smartFuel) {
   const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
   smartFuelMap.set(chave, linha);
+}
+
+const restituicaoMap = new Map();
+
+for (const linha of restituicao) {
+  if (linha.chave) {
+    restituicaoMap.set(linha.chave, linha);
+  }
 }
 
   const rows = data.values;
@@ -368,8 +404,8 @@ const voos = rows.slice(1)
   .map(row => {
     const voo = String(row[idxVoo] || '').trim();
     const origem = idxOrigem >= 0 ? String(row[idxOrigem] || '').trim() : '';
-    const horario = String(row[idxHorario] || '').trim();
-    const calcoBruto = idxCalco >= 0 ? String(row[idxCalco] || '').trim() : '';
+    const horarioProg = extrairHorario(row[idxHorario]);
+    const calcoProg = idxCalco >= 0 ? extrairHorario(row[idxCalco]) : '';
     const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
 
     const fonia1 = String(row[12] || '').trim();
@@ -378,10 +414,10 @@ const voos = rows.slice(1)
     return {
       voo,
       origem,
-      horario,
-      calco: isHorarioValido(calcoBruto) ? calcoBruto : null,
+      horario: horarioProg,
+      calco: isHorarioValido(calcoProg) ? calcoProg : null,
       data: dataLinha,
-      tempo: minutosAteHorario(horario) ?? 0,
+      tempo: minutosAteHorario(horarioProg) ?? 0,
       fonia1,
       fonia2,
     };
@@ -406,19 +442,29 @@ const voos = rows.slice(1)
 .map(v => {
   const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
   const chaveSmartFuel = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}`;
+  const chaveRestituicao = `${normalizarTexto(v.data)}${normalizarTexto(v.voo)}`;
+
+  const monitor = monitorMap.get(chave);
+  const horarioFinal = monitor?.eta || v.horario;
+  const calcoFinal = monitor?.calco || v.calco;
+
   const linhaServico = limpezaMap.get(chave);
   const linhaSmartFuel = smartFuelMap.get(chaveSmartFuel);
+  const linhaRestituicao = restituicaoMap.get(chaveRestituicao);
+
   const valorLimpeza = linhaServico?.equipe ?? '';
   const valorSmartFuel = linhaSmartFuel?.equipe ?? '';
+  const valorRestituicao = linhaRestituicao?.operador ?? '';
   const limpezaEscalada = limpezaEstaEscalada(valorLimpeza);
+  const restituicaoEscalada = Boolean(linhaRestituicao?.confirmado && valorRestituicao);
 
   return {
     voo: v.voo,
     origem: v.origem,
-    horario: v.horario,
-    calco: v.calco,
+    horario: horarioFinal,
+    calco: calcoFinal,
     data: v.data,
-    tempo: v.tempo,
+    tempo: minutosAteHorario(horarioFinal) ?? v.tempo,
     servicos: {
       limpeza: {
         escalado: limpezaEscalada,
@@ -440,11 +486,15 @@ const voos = rows.slice(1)
         escalado: smartFuelEstaEscalado(valorSmartFuel),
         valor: valorSmartFuel,
       },
+      restituiçao: {
+        escalado: restituicaoEscalada,
+        valor: valorRestituicao,
+      },
     },
   };
 })
 
-.filter(v => {
+  .filter(v => {
   const tempo = minutosAteHorario(v.horario);
 
   if (tempo === null || tempo === undefined) return true;
@@ -455,6 +505,8 @@ const voos = rows.slice(1)
   v.servicos.fonia.escalado
   );
 })
+
+
 .slice(0, 15);
 
   console.log('[getVoos] Total voos PROG (após filtro):', voos.length);
