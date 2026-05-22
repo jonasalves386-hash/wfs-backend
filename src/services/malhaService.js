@@ -11,6 +11,26 @@ function normalizarTexto(valor) {
     .replace(/\s+/g, ' ');
 }
 
+function normalizarDataChave(valor) {
+  const texto = String(valor || '').trim();
+
+  const br = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+
+  if (br) {
+    const [, dia, mes, ano] = br;
+    return `${ano}${mes}${dia}`;
+  }
+
+  const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (iso) {
+    const [, ano, mes, dia] = iso;
+    return `${ano}${mes}${dia}`;
+  }
+
+  return normalizarTexto(texto);
+}
+
 function extrairHorario(valor) {
   const texto = String(valor || '').trim();
   const match = texto.match(/([01]\d|2[0-3]):[0-5]\d/);
@@ -351,6 +371,7 @@ const monitorMap = new Map();
 
 for (const linha of monitorChegada) {
   const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
+
   monitorMap.set(chave, linha);
 }
 
@@ -437,14 +458,16 @@ for (const linha of restituicao) {
   }
 
 const voos = rows.slice(1)
+  .filter(row => row && row.some(cell => String(cell || '').trim() !== ''))
   .map(row => {
     const voo = String(row[idxVoo] || '').trim();
     const origem = idxOrigem >= 0 ? String(row[idxOrigem] || '').trim() : '';
-const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
+    const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
+    
+    if (!dataLinha || !voo) return null;
 
-const chaveMonitor = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}`;
+const chaveMonitor = `${normalizarDataChave(dataLinha)}|${normalizarTexto(voo)}`;
 const monitor = monitorMap.get(chaveMonitor);
-
 const horarioFinal = monitor?.eta || '';
 const calcoFinal = null;
 
@@ -462,6 +485,9 @@ return {
   fonia2,
   };
 })
+
+  .filter(Boolean)
+  .filter(v => v.voo)
   .filter(v => v.voo)
   .filter(v => isHorarioValido(v.horario))
   .filter(v => {
@@ -480,7 +506,7 @@ return {
   })
 
 .map(v => {
-  const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
+  const chave = `${normalizarDataChave(linha.data)}|${normalizarTexto(linha.voo)}`;
   const chaveSmartFuel = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}`;
   const dataFormatada = (() => {
   const partes = String(v.data || '').split('/');
