@@ -348,10 +348,14 @@ if (restituicaoResult.status === 'rejected') {
 }
 
 const monitorMap = new Map();
+const monitorMapSimples = new Map();
 
 for (const linha of monitorChegada) {
-  const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
-  monitorMap.set(chave, linha);
+  const chaveCompleta = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
+  const chaveSimples = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
+
+  monitorMap.set(chaveCompleta, linha);
+  monitorMapSimples.set(chaveSimples, linha);
 }
 
   const limpezaMap = new Map();
@@ -443,7 +447,11 @@ const voos = rows.slice(1)
 const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
 
 const chaveMonitor = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}|${normalizarTexto(origem)}`;
-const monitor = monitorMap.get(chaveMonitor);
+const chaveMonitorSimples = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}`;
+
+const monitor =
+  monitorMap.get(chaveMonitor) ||
+  monitorMapSimples.get(chaveMonitorSimples);
 
 const horarioFinal = monitor?.eta || '';
 const calcoFinal = monitor?.calco || '';
