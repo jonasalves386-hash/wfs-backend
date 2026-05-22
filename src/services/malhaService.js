@@ -348,14 +348,10 @@ if (restituicaoResult.status === 'rejected') {
 }
 
 const monitorMap = new Map();
-const monitorMapSimples = new Map();
 
 for (const linha of monitorChegada) {
-  const chaveCompleta = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
-  const chaveSimples = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
-
-  monitorMap.set(chaveCompleta, linha);
-  monitorMapSimples.set(chaveSimples, linha);
+  const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
+  monitorMap.set(chave, linha);
 }
 
   const limpezaMap = new Map();
@@ -446,15 +442,11 @@ const voos = rows.slice(1)
     const origem = idxOrigem >= 0 ? String(row[idxOrigem] || '').trim() : '';
 const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
 
-const chaveMonitor = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}|${normalizarTexto(origem)}`;
-const chaveMonitorSimples = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}`;
-
-const monitor =
-  monitorMap.get(chaveMonitor) ||
-  monitorMapSimples.get(chaveMonitorSimples);
+const chaveMonitor = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}`;
+const monitor = monitorMap.get(chaveMonitor);
 
 const horarioFinal = monitor?.eta || '';
-const calcoFinal = monitor?.calco || '';
+const calcoFinal = null;
 
 const fonia1 = String(row[12] || '').trim();
 const fonia2 = String(row[13] || '').trim();
@@ -463,7 +455,7 @@ return {
   voo,
   origem,
   horario: horarioFinal,
-  calco: isHorarioValido(calcoFinal) ? calcoFinal : null,
+  calco: calcoFinal,
   data: dataLinha,
   tempo: minutosAteHorario(horarioFinal) ?? 0,
   fonia1,
