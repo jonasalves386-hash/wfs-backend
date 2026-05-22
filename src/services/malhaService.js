@@ -440,24 +440,28 @@ const voos = rows.slice(1)
   .map(row => {
     const voo = String(row[idxVoo] || '').trim();
     const origem = idxOrigem >= 0 ? String(row[idxOrigem] || '').trim() : '';
-    const horarioProg = extrairHorario(row[idxHorario]);
-    const calcoProg = idxCalco >= 0 ? extrairHorario(row[idxCalco]) : '';
-    const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
+const dataLinha = idxData >= 0 ? String(row[idxData] || '').trim() : '';
 
-    const fonia1 = String(row[12] || '').trim();
-    const fonia2 = String(row[13] || '').trim();
+const chaveMonitor = `${normalizarTexto(dataLinha)}|${normalizarTexto(voo)}|${normalizarTexto(origem)}`;
+const monitor = monitorMap.get(chaveMonitor);
 
-    return {
-      voo,
-      origem,
-      horario: horarioProg,
-      calco: isHorarioValido(calcoProg) ? calcoProg : null,
-      data: dataLinha,
-      tempo: minutosAteHorario(horarioProg) ?? 0,
-      fonia1,
-      fonia2,
-    };
-  })
+const horarioFinal = monitor?.eta || '';
+const calcoFinal = monitor?.calco || '';
+
+const fonia1 = String(row[12] || '').trim();
+const fonia2 = String(row[13] || '').trim();
+
+return {
+  voo,
+  origem,
+  horario: horarioFinal,
+  calco: isHorarioValido(calcoFinal) ? calcoFinal : null,
+  data: dataLinha,
+  tempo: minutosAteHorario(horarioFinal) ?? 0,
+  fonia1,
+  fonia2,
+  };
+})
   .filter(v => v.voo)
   .filter(v => isHorarioValido(v.horario))
   .filter(v => {
@@ -490,9 +494,9 @@ const voos = rows.slice(1)
 
 const chaveRestituicao = `${dataFormatada}_${normalizarTexto(v.voo)}`;
 
-  const monitor = monitorMap.get(chave);
-  const horarioFinal = monitor?.eta || v.horario;
-  const calcoFinal = monitor?.calco || v.calco;
+  // const monitor = monitorMap.get(chave);
+  // const horarioFinal = monitor?.eta || v.horario;
+  // const calcoFinal = monitor?.calco || v.calco;
 
   const linhaServico = limpezaMap.get(chave);
   const linhaSmartFuel = smartFuelMap.get(chaveSmartFuel);
@@ -507,10 +511,10 @@ const chaveRestituicao = `${dataFormatada}_${normalizarTexto(v.voo)}`;
   return {
     voo: v.voo,
     origem: v.origem,
-    horario: horarioFinal,
-    calco: calcoFinal,
+    horario: v.horario,
+    calco: v.calco,
     data: v.data,
-    tempo: minutosAteHorario(horarioFinal) ?? v.tempo,
+    tempo: v.tempo,
     servicos: {
       limpeza: {
         escalado: limpezaEscalada,
