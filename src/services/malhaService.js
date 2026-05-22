@@ -273,8 +273,42 @@ async function getRestituicaoBag() {
   return rows.slice(1).map(row => ({
     operador: String(row[15] || '').trim(), // P
     confirmado: String(row[16] || '').trim().toUpperCase() === 'TRUE', // Q checkbox
-    chave: normalizarTexto(row[25] || ''), // Z = DATA+VOO
+    chave: String(row[25] || '').trim(), // Z = DATA+VOO
   }));
+}
+
+async function getMonitorChegada() {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
+
+  const sheetId = '1RusxsxP7g-PKVJX5b8qPrl_VojLhvflXqdLOQlk88EQ';
+  const range = encodeURIComponent('monitor_chegada') + '!A:J';
+
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+
+  const { data } = await axios.get(url, {
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  });
+
+  const rows = data.values;
+  if (!rows || rows.length < 2) return [];
+
+  return rows.slice(1).map(row => {
+    const etaFr = extrairHorario(row[6]);
+    const eta = extrairHorario(row[5]);
+    const calco = extrairHorario(row[9]);
+
+    return {
+      data: String(row[0] || '').trim(),
+      voo: String(row[1] || '').trim(),
+      ori: String(row[3] || '').trim(),
+      eta: etaFr || eta,
+      calco,
+    };
+  });
 }
 
 async function getVoos() {
@@ -335,6 +369,8 @@ for (const linha of smartFuel) {
 }
 
 const restituicaoMap = new Map();
+
+
 
 for (const linha of restituicao) {
   if (linha.chave) {
@@ -442,7 +478,17 @@ const voos = rows.slice(1)
 .map(v => {
   const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
   const chaveSmartFuel = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}`;
-  const chaveRestituicao = `${normalizarTexto(v.data)}${normalizarTexto(v.voo)}`;
+  const dataFormatada = (() => {
+  const partes = String(v.data || '').split('/');
+
+  if (partes.length !== 3) return '';
+
+  const [dia, mes, ano] = partes;
+
+  return `${ano}-${mes}-${dia}`;
+})();
+
+const chaveRestituicao = `${dataFormatada}_${normalizarTexto(v.voo)}`;
 
   const monitor = monitorMap.get(chave);
   const horarioFinal = monitor?.eta || v.horario;
@@ -507,7 +553,7 @@ const voos = rows.slice(1)
 })
 
 
-.slice(0, 15);
+.slice(0, 12);
 
   console.log('[getVoos] Total voos PROG (após filtro):', voos.length);
   console.log('[getVoos] Total linhas LIMPEZA:', limpeza.length);
