@@ -298,8 +298,8 @@ async function getRestituicaoBag() {
 }
 
 async function getMonitorChegada() {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
+  const apiKey = process.env.GOOGLE_API_KEY_MONITOR;
+  if (!apiKey) throw new Error('GOOGLE_API_KEY_MONITOR não definida');
 
   const sheetId = '1RusxsxP7g-PKVJX5b8qPrl_VojLhvflXqdLOQlk88EQ';
   const range = encodeURIComponent('monitor_chegada') + '!A:J';
