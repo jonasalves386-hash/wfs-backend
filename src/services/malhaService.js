@@ -1,5 +1,15 @@
 const axios = require('axios');
+const { google } = require('googleapis');
 const { isHorarioValido, isDataValida, isHoje, minutosAteHorario } = require('../utils/parseHorario');
+
+function getGoogleSheetsServiceClient() {
+  const auth = new google.auth.GoogleAuth({
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
+
+  return google.sheets({ version: 'v4', auth });
+}
 
 function normalizarTexto(valor) {
   return String(valor || '')
@@ -298,22 +308,17 @@ async function getRestituicaoBag() {
 }
 
 async function getMonitorChegada() {
-  const apiKey = process.env.GOOGLE_API_KEY_MONITOR;
-  if (!apiKey) throw new Error('GOOGLE_API_KEY_MONITOR não definida');
-
   const sheetId = '1RusxsxP7g-PKVJX5b8qPrl_VojLhvflXqdLOQlk88EQ';
-  const range = encodeURIComponent('monitor_chegada') + '!A:J';
+  const range = 'monitor_chegada!A:J';
 
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+  const sheets = getGoogleSheetsServiceClient();
 
-  const { data } = await axios.get(url, {
-    headers: {
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range,
   });
 
-  const rows = data.values;
+  const rows = response.data.values;
   if (!rows || rows.length < 2) return [];
 
   return rows.slice(1).map(row => {
@@ -358,7 +363,7 @@ if (smartFuelResult.status === 'rejected') {
 const monitorChegada = monitorResult.status === 'fulfilled' ? monitorResult.value : [];
 
 if (monitorResult.status === 'rejected') {
-  console.warn('[getVoos] Falha ao buscar MONITOR CHEGADA, usando ETA/CALÇO da PROG:', monitorResult.reason?.message);
+  console.warn('[getVoos] Falha ao buscar MONITOR CHEGADA, painel ficará sem voos:', monitorResult.reason?.message);
 }
 
 const restituicao = restituicaoResult.status === 'fulfilled' ? restituicaoResult.value : [];
@@ -370,7 +375,7 @@ if (restituicaoResult.status === 'rejected') {
 const monitorMap = new Map();
 
 for (const linha of monitorChegada) {
-  const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
+  const chave = `${normalizarDataChave(linha.data)}|${normalizarTexto(linha.voo)}`;
 
   monitorMap.set(chave, linha);
 }
@@ -488,7 +493,6 @@ return {
 
   .filter(Boolean)
   .filter(v => v.voo)
-  .filter(v => v.voo)
   .filter(v => isHorarioValido(v.horario))
   .filter(v => {
     if (idxData >= 0) {
@@ -506,7 +510,7 @@ return {
   })
 
 .map(v => {
-  const chave = `${normalizarDataChave(linha.data)}|${normalizarTexto(linha.voo)}`;
+  const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
   const chaveSmartFuel = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}`;
   const dataFormatada = (() => {
   const partes = String(v.data || '').split('/');
