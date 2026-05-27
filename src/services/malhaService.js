@@ -47,6 +47,16 @@ function extrairHorario(valor) {
   return match ? match[0] : '';
 }
 
+function isCancelado(...valores) {
+  return valores.some(v =>
+    String(v || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .includes('CANCELADO')
+  );
+}
+
 // Válido: pelo menos um par HH:MM + NOME ou NOME + HH:MM (nome = 2+ letras consecutivas)
 function limpezaEstaEscalada(valor) {
   const texto = String(valor || '').trim();
@@ -158,7 +168,7 @@ const FONIA_EQUIPES_VALIDAS_RAW = [
 'UNIFORM - T3', 'UNIFORM - T4', 'VICTOR- T1', 'VICTOR - T2', 'VICTOR- T3', 'VICTOR - T4', 'WHISKEY - T1', 'WHISKEY -T2', 'WHISKEY - T3', 'WHISKEY - T4', 'X RAY - T1', 'X RAY -T2',
 'X RAY-T3', 'X RAY- T4', 'XADREZ-T3', 'XADREZ - T4', 'YANKEE-T1', 'YANKEE - T2', 'YANKEE-T3', 'YANKEE - T4', 'YELLOW-T1', 'YELLOW- T2', 'YELLOW- T3', 'YELLOW- T4', 'ZULU - T1',
 'ZULU- T2', 'ZULU- T3', 'ZULU - T4', 'ELITE - T3', 'TRASLADO', 'ELITE -T4', 'FENIX - T3', 'FENIX - T4', 'TITANIUM- T4', 'BRONZE - T4', 'PRATA- T4','APOIO - T1', 'APOIO - T2',
-'APOIO - T3', 'APOIO - T4', 'DOURADOS - T1', 'DOURADOS - T2', 'DOURADOS - T3', 'DOURADOS - T4',
+'APOIO - T3', 'APOIO - T4', 'DOURADOS - T1', 'DOURADOS - T2', 'DOURADOS - T3', 'DOURADOS - T4'
 ];
 
 function normalizarEquipeFonia(valor) {
@@ -476,8 +486,11 @@ const monitor = monitorMap.get(chaveMonitor);
 const horarioFinal = monitor?.eta || '';
 const calcoFinal = null;
 
-const fonia1 = String(row[12] || '').trim();
-const fonia2 = String(row[13] || '').trim();
+const fonia1 = String(row[12] || '').trim(); // N
+const fonia2 = String(row[13] || '').trim(); // O
+
+// Se N ou O tiver CANCELADO, o voo não entra no painel
+if (isCancelado(fonia1, fonia2)) return null;
 
 return {
   voo,
