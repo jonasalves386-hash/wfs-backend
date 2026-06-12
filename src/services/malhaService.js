@@ -179,6 +179,8 @@ function normalizarEquipeFonia(valor) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s*-\s*/g, '-')
     .replace(/\bAPOIO\s+T([1-4])\b/g, 'APOIO-T$1')
+    .replace(/\bXADREZ\s+T([1-4])\b/g, 'XADREZ-T$1')
+    .replace(/\bDOURADOS\s+T([1-4])\b/g, 'DOURADOS-T$1')
     .replace(/\s+/g, ' ');
 }
 
