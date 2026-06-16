@@ -47,14 +47,24 @@ function extrairHorario(valor) {
   return match ? match[0] : '';
 }
 
+// Termos/abreviacoes usados pelas equipes para marcar voo cancelado nas colunas N/O.
+// "CANCEL" ja cobre CANCELADO/CANCELADOS/CANCELADA/CANCELAMENTO por substring.
+const TERMOS_CANCELAMENTO = ['CANCEL', 'CANC', 'CNL', 'CXL'];
+
 function isCancelado(...valores) {
-  return valores.some(v =>
-    String(v || '')
+  return valores.some(v => {
+    const texto = String(v ?? '')
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u0300-\u036f]/g, '') // remove acentos
+      .replace(/[\u00a0\u200b\u2000-\u200a\t\r\n]/g, ' ') // espaco nao separavel, zero-width, tab, quebras de linha
       .toUpperCase()
-      .includes('CANCELADO')
-  );
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!texto) return false;
+
+    return TERMOS_CANCELAMENTO.some(termo => texto.includes(termo));
+  });
 }
 
 // Válido: pelo menos um par HH:MM + NOME ou NOME + HH:MM (nome = 2+ letras consecutivas)

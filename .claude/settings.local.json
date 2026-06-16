@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Users\\\\Jonas Alves\\\\source\\\\WFS-PAINEL\\\\back-end\" remote -v)",
+      "Bash(git -C \"C:\\\\Users\\\\Jonas Alves\\\\source\\\\WFS-PAINEL\\\\back-end\" status)",
+      "Bash(git -C \"C:\\\\Users\\\\Jonas Alves\\\\source\\\\WFS-PAINEL\\\\back-end\" log --oneline)",
+      "Bash(git *)"
+    ]
+  }
+}
