@@ -51,6 +51,23 @@ function normalizarDataChave(valor) {
   return normalizarTexto(texto);
 }
 
+// Chave padronizada para todos os serviços: "YYYY-MM-DD_VOO" (sem zeros à esquerda no voo)
+function montarChaveVoo(dataStr, vooStr) {
+  const dataTexto = String(dataStr || '').trim();
+  let dataISO = '';
+
+  const brMatch = dataTexto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    dataISO = `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+  } else {
+    const isoMatch = dataTexto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) dataISO = dataTexto;
+  }
+
+  const vooNorm = normalizarTexto(String(vooStr || '')).replace(/^0+/, '');
+  return `${dataISO}_${vooNorm}`;
+}
+
 function extrairHorario(valor) {
   const texto = String(valor || '').trim();
   const match = texto.match(/([01]\d|2[0-3]):[0-5]\d/);
@@ -332,11 +349,18 @@ async function getRestituicaoBag() {
   const rows = data.values;
   if (!rows || rows.length < 2) return [];
 
-  return rows.slice(1).map(row => ({
-    operador: String(row[15] || '').trim(), // P
-    confirmado: String(row[16] || '').trim().toUpperCase() === 'TRUE', // Q checkbox
-    chave: String(row[25] || '').trim(), // Z = DATA+VOO
-  }));
+  return rows.slice(1).map(row => {
+    const chaveRaw = String(row[25] || '').trim(); // Z = DATA+VOO (formato YYYY-MM-DD_VOO)
+    const underIdx = chaveRaw.indexOf('_');
+    const chave = underIdx >= 0
+      ? montarChaveVoo(chaveRaw.substring(0, underIdx), chaveRaw.substring(underIdx + 1))
+      : '';
+    return {
+      operador: String(row[15] || '').trim(), // P
+      confirmado: String(row[16] || '').trim().toUpperCase() === 'TRUE', // Q checkbox
+      chave,
+    };
+  });
 }
 
 async function getMonitorChegada() {
@@ -386,12 +410,17 @@ async function getDoorInfo() {
   }
 
   return rows.slice(1).map(row => {
-    const id = String(row[0] || '').trim();
+    const id = String(row[0] || '').trim(); // A = "2026-06-26_3960"
     const openDoorRaw = String(row[18] || '').trim(); // Coluna S (índice 18)
     const openDoor = extrairHorario(openDoorRaw);
 
-    return { id, openDoor };
-  }).filter(r => r.id);
+    const underIdx = id.indexOf('_');
+    const chave = underIdx >= 0
+      ? montarChaveVoo(id.substring(0, underIdx), id.substring(underIdx + 1))
+      : '';
+
+    return { chave, openDoor };
+  }).filter(r => r.chave);
 }
 
 async function getVoos() {
@@ -434,23 +463,22 @@ if (restituicaoResult.status === 'rejected') {
 const monitorMap = new Map();
 
 for (const linha of monitorChegada) {
-  const chave = `${normalizarDataChave(linha.data)}|${normalizarTexto(linha.voo)}`;
-
-  monitorMap.set(chave, linha);
+  const chave = montarChaveVoo(linha.data, linha.voo);
+  if (chave) monitorMap.set(chave, linha);
 }
 
-  const limpezaMap = new Map();
+const limpezaMap = new Map();
 
-  for (const linha of limpeza) {
-    const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}|${normalizarTexto(linha.ori)}`;
-    limpezaMap.set(chave, linha);
-  }
+for (const linha of limpeza) {
+  const chave = montarChaveVoo(linha.data, linha.voo);
+  if (chave) limpezaMap.set(chave, linha);
+}
 
 const smartFuelMap = new Map();
 
 for (const linha of smartFuel) {
-  const chave = `${normalizarTexto(linha.data)}|${normalizarTexto(linha.voo)}`;
-  smartFuelMap.set(chave, linha);
+  const chave = montarChaveVoo(linha.data, linha.voo);
+  if (chave) smartFuelMap.set(chave, linha);
 }
 
 const restituicaoMap = new Map();
@@ -468,8 +496,8 @@ if (doorInfoResult.status === 'rejected') {
 
 const doorInfoMap = new Map();
 for (const linha of doorInfo) {
-  if (linha.id) {
-    doorInfoMap.set(linha.id.toUpperCase(), linha);
+  if (linha.chave) {
+    doorInfoMap.set(linha.chave, linha);
   }
 }
 logPortas('INFO', `DOOR_INFO carregado: ${doorInfo.length} registros`);
@@ -541,7 +569,7 @@ const voos = rows.slice(1)
     
     if (!dataLinha || !voo) return null;
 
-const chaveMonitor = `${normalizarDataChave(dataLinha)}|${normalizarTexto(voo)}`;
+const chaveMonitor = montarChaveVoo(dataLinha, voo);
 const monitor = monitorMap.get(chaveMonitor);
 const horarioFinal = monitor?.eta || '';
 const calcoFinal = null;
@@ -583,36 +611,19 @@ return {
   })
 
 .map(v => {
-  const chave = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}|${normalizarTexto(v.origem)}`;
-  const chaveSmartFuel = `${normalizarTexto(v.data)}|${normalizarTexto(v.voo)}`;
-  const dataFormatada = (() => {
-  const partes = String(v.data || '').split('/');
+  const chaveVoo = montarChaveVoo(v.data, v.voo);
 
-  if (partes.length !== 3) return '';
+  const linhaServico = limpezaMap.get(chaveVoo);
+  const linhaSmartFuel = smartFuelMap.get(chaveVoo);
+  const linhaRestituicao = restituicaoMap.get(chaveVoo);
+  const monitorPortas = monitorMap.get(chaveVoo);
+  const linhaDoorInfo = doorInfoMap.get(chaveVoo);
 
-  const [dia, mes, ano] = partes;
-
-  return `${ano}-${mes}-${dia}`;
-})();
-
-const chaveRestituicao = `${dataFormatada}_${normalizarTexto(v.voo)}`;
-
-  // const monitor = monitorMap.get(chave);
-  // const horarioFinal = monitor?.eta || v.horario;
-  // const calcoFinal = monitor?.calco || v.calco;
-
-  const linhaServico = limpezaMap.get(chave);
-  const linhaSmartFuel = smartFuelMap.get(chaveSmartFuel);
-  const linhaRestituicao = restituicaoMap.get(chaveRestituicao);
-
-  const chaveMonitorPortas = `${normalizarDataChave(v.data)}|${normalizarTexto(v.voo)}`;
-  const monitorPortas = monitorMap.get(chaveMonitorPortas);
   const calcoPortas = monitorPortas?.calco || null;
-  const linhaDoorInfo = doorInfoMap.get(chaveRestituicao.toUpperCase());
   const openDoorPortas = linhaDoorInfo?.openDoor || null;
 
   if (linhaDoorInfo) {
-    logPortas('INFO', `Match PORTAS voo=${v.voo} openDoor=${openDoorPortas} calco=${calcoPortas}`);
+    logPortas('INFO', `Match PORTAS voo=${v.voo} chave=${chaveVoo} openDoor=${openDoorPortas} calco=${calcoPortas}`);
   }
 
   const valorLimpeza = linhaServico?.equipe ?? '';
