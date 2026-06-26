@@ -2,6 +2,16 @@ const axios = require('axios');
 const { google } = require('googleapis');
 const { isHorarioValido, isDataValida, isHoje, minutosAteHorario } = require('../utils/parseHorario');
 
+function logPortas(nivel, msg, extra) {
+  const ts = new Date().toISOString();
+  const linha = extra !== undefined
+    ? `[${ts}] [PORTAS] [${nivel}] ${msg} ${JSON.stringify(extra)}`
+    : `[${ts}] [PORTAS] [${nivel}] ${msg}`;
+  if (nivel === 'ERROR') console.error(linha);
+  else if (nivel === 'WARN') console.warn(linha);
+  else console.log(linha);
+}
+
 function getGoogleSheetsServiceClient() {
   const auth = new google.auth.GoogleAuth({
     keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -176,7 +186,7 @@ const FONIA_EQUIPES_VALIDAS_RAW = [
 'RED-T4', 'ROMA-T1', 'ROMA-T2', 'ROMA-T3', 'ROMA-T4', 'ROMEO- T1', 'ROMEO - T2', 'ROMEO-T3', 'ROMEO - T4', 'SIERRA - T1', 'SIERRA - T2', 'SIERRA - T3', 'SIERRA - T4',
 'SILVER-T1', 'SILVER-T2', 'SILVER-T3', 'SILVER-T4', 'TANGO - T1', 'TANGO - T2', 'TANGO - T3', 'TANGO- T4', 'TITANIUM- T2', 'TITANIUM- T3', 'UNIFORM- T1', 'UNIFORM - T2',
 'UNIFORM - T3', 'UNIFORM - T4', 'VICTOR- T1', 'VICTOR - T2', 'VICTOR- T3', 'VICTOR - T4', 'WHISKEY - T1', 'WHISKEY -T2', 'WHISKEY - T3', 'WHISKEY - T4', 'X RAY - T1', 'X RAY -T2',
-'X RAY-T3', 'X RAY- T4', 'XADREZ-T1', 'XADREZ-T2', 'XADREZ-T3', 'XADREZ - T4', 'YANKEE-T1', 'YANKEE - T2', 'YANKEE-T3', 'YANKEE - T4', 'YELLOW-T1', 'YELLOW- T2', 'YELLOW- T3', 'YELLOW- T4', 'ZULU - T1',
+'X RAY-T3', 'X RAY- T4', 'XADREZ - T1', 'XADREZ - T2', 'XADREZ - T3', 'XADREZ - T4', 'YANKEE-T1', 'YANKEE - T2', 'YANKEE-T3', 'YANKEE - T4', 'YELLOW-T1', 'YELLOW- T2', 'YELLOW- T3', 'YELLOW- T4', 'ZULU - T1',
 'ZULU- T2', 'ZULU- T3', 'ZULU - T4', 'ELITE - T3', 'TRASLADO', 'ELITE -T4', 'FENIX - T3', 'FENIX - T4', 'TITANIUM- T4', 'BRONZE - T4', 'PRATA- T4','APOIO - T1', 'APOIO - T2',
 'APOIO - T3', 'APOIO - T4', 'DOURADOS - T1', 'DOURADOS - T2', 'DOURADOS - T3', 'DOURADOS - T4'
 ];
@@ -358,15 +368,42 @@ async function getMonitorChegada() {
   });
 }
 
+async function getDoorInfo() {
+  const sheetId = '1QPParvZWnYCrPJJUyRzkzUmr4zMVCUqLUAejb1t9sXk';
+  const range = 'DOOR_INFO!A:S';
+
+  const sheets = getGoogleSheetsServiceClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range,
+  });
+
+  const rows = response.data.values;
+  if (!rows || rows.length < 2) {
+    logPortas('WARN', 'Planilha DOOR_INFO vazia ou sem dados suficientes');
+    return [];
+  }
+
+  return rows.slice(1).map(row => {
+    const id = String(row[0] || '').trim();
+    const openDoorRaw = String(row[18] || '').trim(); // Coluna S (índice 18)
+    const openDoor = extrairHorario(openDoorRaw);
+
+    return { id, openDoor };
+  }).filter(r => r.id);
+}
+
 async function getVoos() {
   const url = montarUrl();
 
-const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult] = await Promise.allSettled([
+const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult, doorInfoResult] = await Promise.allSettled([
   axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
   getLimpeza(),
   getSmartFuel(),
   getMonitorChegada(),
   getRestituicaoBag(),
+  getDoorInfo(),
 ]);
 
   if (progResult.status === 'rejected') throw progResult.reason;
@@ -418,13 +455,24 @@ for (const linha of smartFuel) {
 
 const restituicaoMap = new Map();
 
-
-
 for (const linha of restituicao) {
   if (linha.chave) {
     restituicaoMap.set(linha.chave, linha);
   }
 }
+
+const doorInfo = doorInfoResult.status === 'fulfilled' ? doorInfoResult.value : [];
+if (doorInfoResult.status === 'rejected') {
+  logPortas('ERROR', 'Falha ao buscar DOOR_INFO, PORTAS ficará sem dados:', doorInfoResult.reason?.message);
+}
+
+const doorInfoMap = new Map();
+for (const linha of doorInfo) {
+  if (linha.id) {
+    doorInfoMap.set(linha.id.toUpperCase(), linha);
+  }
+}
+logPortas('INFO', `DOOR_INFO carregado: ${doorInfo.length} registros`);
 
   const rows = data.values;
 
@@ -557,6 +605,16 @@ const chaveRestituicao = `${dataFormatada}_${normalizarTexto(v.voo)}`;
   const linhaSmartFuel = smartFuelMap.get(chaveSmartFuel);
   const linhaRestituicao = restituicaoMap.get(chaveRestituicao);
 
+  const chaveMonitorPortas = `${normalizarDataChave(v.data)}|${normalizarTexto(v.voo)}`;
+  const monitorPortas = monitorMap.get(chaveMonitorPortas);
+  const calcoPortas = monitorPortas?.calco || null;
+  const linhaDoorInfo = doorInfoMap.get(chaveRestituicao.toUpperCase());
+  const openDoorPortas = linhaDoorInfo?.openDoor || null;
+
+  if (linhaDoorInfo) {
+    logPortas('INFO', `Match PORTAS voo=${v.voo} openDoor=${openDoorPortas} calco=${calcoPortas}`);
+  }
+
   const valorLimpeza = linhaServico?.equipe ?? '';
   const valorSmartFuel = linhaSmartFuel?.equipe ?? '';
   const valorRestituicao = linhaRestituicao?.operador ?? '';
@@ -594,6 +652,10 @@ const chaveRestituicao = `${dataFormatada}_${normalizarTexto(v.voo)}`;
       restituiçao: {
         escalado: restituicaoEscalada,
         valor: valorRestituicao,
+      },
+      portas: {
+        calco: calcoPortas,
+        openDoor: openDoorPortas,
       },
     },
   };
