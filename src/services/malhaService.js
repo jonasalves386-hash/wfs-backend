@@ -51,6 +51,26 @@ function normalizarDataChave(valor) {
   return normalizarTexto(texto);
 }
 
+const FINGER_POSITIONS = new Set([
+  '207','208','209','210',
+  '211L','211','211R',
+  '212L','212','212R',
+  '301','301R',
+  '302L','302','302R',
+  '303L','303R',
+  '304','305','306','307','308','309','310','311','312',
+  '401','402L','402','402R','403','404','405','406',
+  '507L','507','507R',
+  '508L','508','508R',
+  '509L','509','509R',
+  '510L','510','510R',
+  '511L','511','511R',
+]);
+
+function isFingerBox(box) {
+  return FINGER_POSITIONS.has(String(box || '').trim().toUpperCase());
+}
+
 // Chave padronizada para todos os serviços: "YYYY-MM-DD_VOO" (sem zeros à esquerda no voo)
 function montarChaveVoo(dataStr, vooStr) {
   const dataTexto = String(dataStr || '').trim();
@@ -365,7 +385,7 @@ async function getRestituicaoBag() {
 
 async function getMonitorChegada() {
   const sheetId = '1RusxsxP7g-PKVJX5b8qPrl_VojLhvflXqdLOQlk88EQ';
-  const range = 'monitor_chegada!A:J';
+  const range = 'monitor_chegada!A:K';
 
   const sheets = getGoogleSheetsServiceClient();
 
@@ -388,6 +408,7 @@ async function getMonitorChegada() {
       ori: String(row[3] || '').trim(),
       eta: etaFr || eta,
       calco,
+      box: String(row[10] || '').trim(),
     };
   });
 }
@@ -621,6 +642,8 @@ return {
 
   const calcoPortas = monitorPortas?.calco || null;
   const openDoorPortas = linhaDoorInfo?.openDoor || null;
+  const boxPortas = monitorPortas?.box || '';
+  const isFingerPos = isFingerBox(boxPortas);
 
   if (linhaDoorInfo) {
     logPortas('INFO', `Match PORTAS voo=${v.voo} chave=${chaveVoo} openDoor=${openDoorPortas} calco=${calcoPortas}`);
@@ -667,6 +690,7 @@ return {
       portas: {
         calco: calcoPortas,
         openDoor: openDoorPortas,
+        isFinger: isFingerPos,
       },
     },
   };
@@ -677,8 +701,13 @@ return {
 
   if (tempo === null || tempo === undefined) return true;
 
+  if (v.servicos.portas?.isFinger) {
+    return !(tempo <= 0 && v.servicos.limpeza.escalado && v.servicos.fonia.escalado);
+  }
+
   return !(
   tempo <= 0 &&
+  v.servicos.portas?.openDoor &&
   v.servicos.limpeza.escalado &&
   v.servicos.fonia.escalado
   );
