@@ -12,13 +12,15 @@ function logPortas(nivel, msg, extra) {
   else console.log(linha);
 }
 
-function getGoogleSheetsServiceClient() {
-  const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
+const _sheetsAuth = new google.auth.GoogleAuth({
+  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+});
 
-  return google.sheets({ version: 'v4', auth });
+const _sheetsClient = google.sheets({ version: 'v4', auth: _sheetsAuth });
+
+function getGoogleSheetsServiceClient() {
+  return _sheetsClient;
 }
 
 function normalizarTexto(valor) {
@@ -598,7 +600,7 @@ const calcoFinal = null;
 const fonia1 = String(row[12] || '').trim(); // N
 const fonia2 = String(row[13] || '').trim(); // O
 
-// Se N ou O tiver CANCELADO, o voo não entra no painel
+// Se N ou O tiver CANCELADO, o voo não entra no painel.
 if (isCancelado(fonia1, fonia2)) return null;
 
 return {
