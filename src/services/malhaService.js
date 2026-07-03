@@ -432,17 +432,31 @@ async function getDoorInfo() {
     return [];
   }
 
-  return rows.slice(1).map(row => {
-    const id = String(row[0] || '').trim(); // A = "2026-06-26_3960"
+  return rows.slice(1).flatMap(row => {
+    const id = String(row[0] || '').trim(); // A = "YYYY-MM-DD_VOO" ou "YYYY-DD-MM_VOO"
     const openDoorRaw = String(row[18] || '').trim(); // Coluna S (índice 18)
     const openDoor = extrairHorario(openDoorRaw);
 
     const underIdx = id.indexOf('_');
-    const chave = underIdx >= 0
-      ? montarChaveVoo(id.substring(0, underIdx), id.substring(underIdx + 1))
-      : '';
+    if (underIdx < 0) return [];
 
-    return { chave, openDoor };
+    const datePart = id.substring(0, underIdx);
+    const vooStr = id.substring(underIdx + 1);
+    const vooNorm = normalizarTexto(vooStr).replace(/^0+/, '');
+
+    const dateMatch = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!dateMatch) return [];
+
+    const [, ano, p2, p3] = dateMatch;
+    const chaves = new Set();
+
+    // YYYY-MM-DD (padrão ISO: p2 = mês)
+    if (parseInt(p2) <= 12) chaves.add(`${ano}-${p2}-${p3}_${vooNorm}`);
+
+    // YYYY-DD-MM (invertido: p3 = mês)
+    if (parseInt(p3) <= 12) chaves.add(`${ano}-${p3}-${p2}_${vooNorm}`);
+
+    return [...chaves].map(chave => ({ chave, openDoor }));
   }).filter(r => r.chave);
 }
 
