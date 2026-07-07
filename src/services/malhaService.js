@@ -123,6 +123,8 @@ function limpezaEstaEscalada(valor) {
   return /([01]\d|2[0-3]):[0-5]\d\s+[A-Za-zÀ-ÿ]{2,}|[A-Za-zÀ-ÿ]{2,}\s+([01]\d|2[0-3]):[0-5]\d/.test(texto);
 }
 
+let limpezaCache = [];
+
 async function getLimpeza() {
   const sheetId = '17ggPnOyf-xzDX8WWgGhKGyf0fkwiCvmWZhLbYEup8Eo';
   const range = 'NARROW!A:Q';
@@ -133,11 +135,14 @@ async function getLimpeza() {
     try {
       const response = await sheets.spreadsheets.values.get(
         { spreadsheetId: sheetId, range },
-        { timeout: 10000 }
+        { timeout: 20000 }
       );
       const rows = response.data.values;
-      if (!rows || rows.length < 2) return [];
-      return rows.slice(1).map(row => ({
+      if (!rows || rows.length < 2) {
+        limpezaCache = [];
+        return limpezaCache;
+      }
+      const resultado = rows.slice(1).map(row => ({
         data:   String(row[0] || '').trim(),
         voo:    String(row[1] || '').trim(),
         ori:    String(row[2] || '').trim(),
@@ -147,12 +152,15 @@ async function getLimpeza() {
         qtu1:   String(row[15] || '').trim(),
         qtu2:   String(row[16] || '').trim(),
       }));
+      limpezaCache = resultado;
+      return resultado;
     } catch (err) {
       lastErr = err;
       if (attempt < 3) await new Promise(r => setTimeout(r, 400 * attempt));
     }
   }
-  throw lastErr;
+  console.warn('[LIMPEZA] Falha na leitura. Utilizando último cache válido.');
+  return limpezaCache;
 }
 
 async function getSmartFuel() {
