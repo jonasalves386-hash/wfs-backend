@@ -126,27 +126,33 @@ function limpezaEstaEscalada(valor) {
 async function getLimpeza() {
   const sheetId = '17ggPnOyf-xzDX8WWgGhKGyf0fkwiCvmWZhLbYEup8Eo';
   const range = 'NARROW!A:Q';
-
   const sheets = getGoogleSheetsServiceClient();
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range,
-  });
-
-  const rows = response.data.values;
-  if (!rows || rows.length < 2) return [];
-
-  return rows.slice(1).map(row => ({
-    data:   String(row[0] || '').trim(),
-    voo:    String(row[1] || '').trim(),
-    ori:    String(row[2] || '').trim(),
-    equipe: String(row[6] || '').trim(),
-    qta1:   String(row[9] || '').trim(),
-    qta2:   String(row[10] || '').trim(),
-    qtu1:   String(row[15] || '').trim(),
-    qtu2:   String(row[16] || '').trim(),
-  }));
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range,
+      });
+      const rows = response.data.values;
+      if (!rows || rows.length < 2) return [];
+      return rows.slice(1).map(row => ({
+        data:   String(row[0] || '').trim(),
+        voo:    String(row[1] || '').trim(),
+        ori:    String(row[2] || '').trim(),
+        equipe: String(row[6] || '').trim(),
+        qta1:   String(row[9] || '').trim(),
+        qta2:   String(row[10] || '').trim(),
+        qtu1:   String(row[15] || '').trim(),
+        qtu2:   String(row[16] || '').trim(),
+      }));
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 3) await new Promise(r => setTimeout(r, 400 * attempt));
+    }
+  }
+  throw lastErr;
 }
 
 async function getSmartFuel() {
