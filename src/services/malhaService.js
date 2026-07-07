@@ -133,6 +133,7 @@ async function getLimpeza() {
 
   const { data } = await axios.get(url, {
     headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    timeout: 10000,
   });
 
   const rows = data.values;
@@ -160,6 +161,7 @@ async function getSmartFuel() {
 
   const { data } = await axios.get(url, {
     headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    timeout: 10000,
   });
 
   const rows = data.values;
@@ -366,6 +368,7 @@ async function getRestituicaoBag() {
 
   const { data } = await axios.get(url, {
     headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+    timeout: 10000,
   });
 
   const rows = data.values;
@@ -464,7 +467,7 @@ async function getVoos() {
   const url = montarUrl();
 
 const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult, doorInfoResult] = await Promise.allSettled([
-  axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } }),
+  axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }, timeout: 10000 }),
   getLimpeza(),
   getSmartFuel(),
   getMonitorChegada(),
