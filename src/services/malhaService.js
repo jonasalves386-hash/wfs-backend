@@ -131,10 +131,10 @@ async function getLimpeza() {
   let lastErr;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range,
-      });
+      const response = await sheets.spreadsheets.values.get(
+        { spreadsheetId: sheetId, range },
+        { timeout: 10000 }
+      );
       const rows = response.data.values;
       if (!rows || rows.length < 2) return [];
       return rows.slice(1).map(row => ({
@@ -398,10 +398,10 @@ async function getMonitorChegada() {
 
   const sheets = getGoogleSheetsServiceClient();
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range,
-  });
+  const response = await sheets.spreadsheets.values.get(
+    { spreadsheetId: sheetId, range },
+    { timeout: 10000 }
+  );
 
   const rows = response.data.values;
   if (!rows || rows.length < 2) return [];
@@ -428,10 +428,10 @@ async function getDoorInfo() {
 
   const sheets = getGoogleSheetsServiceClient();
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range,
-  });
+  const response = await sheets.spreadsheets.values.get(
+    { spreadsheetId: sheetId, range },
+    { timeout: 10000 }
+  );
 
   const rows = response.data.values;
   if (!rows || rows.length < 2) {
