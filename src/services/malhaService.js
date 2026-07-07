@@ -124,26 +124,24 @@ function limpezaEstaEscalada(valor) {
 }
 
 async function getLimpeza() {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
-
   const sheetId = '17ggPnOyf-xzDX8WWgGhKGyf0fkwiCvmWZhLbYEup8Eo';
-  const range = encodeURIComponent('NARROW') + '!A:Q';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+  const range = 'NARROW!A:Q';
 
-  const { data } = await axios.get(url, {
-    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
-    timeout: 10000,
+  const sheets = getGoogleSheetsServiceClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range,
   });
 
-  const rows = data.values;
+  const rows = response.data.values;
   if (!rows || rows.length < 2) return [];
 
   return rows.slice(1).map(row => ({
-    data:   String(row[0] || '').trim(), // A = DATA
-    voo:    String(row[1] || '').trim(), // B = VOO
-    ori:    String(row[2] || '').trim(), // C = ORI
-    equipe: String(row[6] || '').trim(), // G = EQUIPE LIMPEZA
+    data:   String(row[0] || '').trim(),
+    voo:    String(row[1] || '').trim(),
+    ori:    String(row[2] || '').trim(),
+    equipe: String(row[6] || '').trim(),
     qta1:   String(row[9] || '').trim(),
     qta2:   String(row[10] || '').trim(),
     qtu1:   String(row[15] || '').trim(),
