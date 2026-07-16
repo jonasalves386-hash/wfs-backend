@@ -139,7 +139,7 @@ async function getLimpeza() {
       );
       const rows = response.data.values;
       if (!rows || rows.length < 2) {
-        limpezaCache = [];
+        console.warn('[LIMPEZA] Falha na leitura. Utilizando último cache válido.');
         return limpezaCache;
       }
       const resultado = rows.slice(1).map(row => ({
@@ -402,7 +402,7 @@ async function getRestituicaoBag() {
 
 async function getMonitorChegada() {
   const sheetId = '1RusxsxP7g-PKVJX5b8qPrl_VojLhvflXqdLOQlk88EQ';
-  const range = 'monitor_chegada!A:K';
+  const range = 'monitor_chegada!A:Q';
 
   const sheets = getGoogleSheetsServiceClient();
 
@@ -418,6 +418,8 @@ async function getMonitorChegada() {
     const etaFr = extrairHorario(row[6]);
     const eta = extrairHorario(row[5]);
     const calco = extrairHorario(row[9]);
+    const paxDoorOpen = extrairHorario(row[15]); // P = PAX_DOOR_OPEN (principal)
+    const deboarding = extrairHorario(row[16]); // Q = DEBOARDING (secundária)
 
     return {
       data: String(row[0] || '').trim(),
@@ -426,65 +428,21 @@ async function getMonitorChegada() {
       eta: etaFr || eta,
       calco,
       box: String(row[10] || '').trim(),
+      paxDoorOpen,
+      deboarding,
     };
   });
-}
-
-async function getDoorInfo() {
-  const sheetId = '1QPParvZWnYCrPJJUyRzkzUmr4zMVCUqLUAejb1t9sXk';
-  const range = 'DOOR_INFO!A:S';
-
-  const sheets = getGoogleSheetsServiceClient();
-
-  const response = await sheets.spreadsheets.values.get(
-    { spreadsheetId: sheetId, range },
-    { timeout: 10000 }
-  );
-
-  const rows = response.data.values;
-  if (!rows || rows.length < 2) {
-    logPortas('WARN', 'Planilha DOOR_INFO vazia ou sem dados suficientes');
-    return [];
-  }
-
-  return rows.slice(1).flatMap(row => {
-    const id = String(row[0] || '').trim(); // A = "YYYY-MM-DD_VOO" ou "YYYY-DD-MM_VOO"
-    const openDoorRaw = String(row[18] || '').trim(); // Coluna S (índice 18)
-    const openDoor = extrairHorario(openDoorRaw);
-
-    const underIdx = id.indexOf('_');
-    if (underIdx < 0) return [];
-
-    const datePart = id.substring(0, underIdx);
-    const vooStr = id.substring(underIdx + 1);
-    const vooNorm = normalizarTexto(vooStr).replace(/^0+/, '');
-
-    const dateMatch = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!dateMatch) return [];
-
-    const [, ano, p2, p3] = dateMatch;
-    const chaves = new Set();
-
-    // YYYY-MM-DD (padrão ISO: p2 = mês)
-    if (parseInt(p2) <= 12) chaves.add(`${ano}-${p2}-${p3}_${vooNorm}`);
-
-    // YYYY-DD-MM (invertido: p3 = mês)
-    if (parseInt(p3) <= 12) chaves.add(`${ano}-${p3}-${p2}_${vooNorm}`);
-
-    return [...chaves].map(chave => ({ chave, openDoor }));
-  }).filter(r => r.chave);
 }
 
 async function getVoos() {
   const url = montarUrl();
 
-const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult, doorInfoResult] = await Promise.allSettled([
+const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult] = await Promise.allSettled([
   axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }, timeout: 10000 }),
   getLimpeza(),
   getSmartFuel(),
   getMonitorChegada(),
   getRestituicaoBag(),
-  getDoorInfo(),
 ]);
 
   if (progResult.status === 'rejected') throw progResult.reason;
@@ -540,19 +498,6 @@ for (const linha of restituicao) {
     restituicaoMap.set(linha.chave, linha);
   }
 }
-
-const doorInfo = doorInfoResult.status === 'fulfilled' ? doorInfoResult.value : [];
-if (doorInfoResult.status === 'rejected') {
-  logPortas('ERROR', 'Falha ao buscar DOOR_INFO, PORTAS ficará sem dados:', doorInfoResult.reason?.message);
-}
-
-const doorInfoMap = new Map();
-for (const linha of doorInfo) {
-  if (linha.chave) {
-    doorInfoMap.set(linha.chave, linha);
-  }
-}
-logPortas('INFO', `DOOR_INFO carregado: ${doorInfo.length} registros`);
 
   const rows = data.values;
 
@@ -669,14 +614,13 @@ return {
   const linhaSmartFuel = smartFuelMap.get(chaveVoo);
   const linhaRestituicao = restituicaoMap.get(chaveVoo);
   const monitorPortas = monitorMap.get(chaveVoo);
-  const linhaDoorInfo = doorInfoMap.get(chaveVoo);
 
   const calcoPortas = monitorPortas?.calco || null;
-  const openDoorPortas = linhaDoorInfo?.openDoor || null;
+  const openDoorPortas = monitorPortas?.paxDoorOpen || monitorPortas?.deboarding || null;
   const boxPortas = monitorPortas?.box || '';
   const isFingerPos = isFingerBox(boxPortas);
 
-  if (linhaDoorInfo) {
+  if (monitorPortas) {
     logPortas('INFO', `Match PORTAS voo=${v.voo} chave=${chaveVoo} openDoor=${openDoorPortas} calco=${calcoPortas}`);
   }
 
