@@ -1,4 +1,3 @@
-const axios = require('axios');
 const { google } = require('googleapis');
 const { isHorarioValido, isDataValida, isHoje, minutosAteHorario } = require('../utils/parseHorario');
 
@@ -164,19 +163,16 @@ async function getLimpeza() {
 }
 
 async function getSmartFuel() {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
-
   const sheetId = '1OYyGTUYqlaQvp0xWZ9Bys-8EmxFf12CEjbuPb8E0F-w';
-  const range = encodeURIComponent('SMART FUEL') + '!B:AM';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+  const range = 'SMART FUEL!B:AM';
+  const sheets = getGoogleSheetsServiceClient();
 
-  const { data } = await axios.get(url, {
-    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
-    timeout: 10000,
-  });
+  const response = await sheets.spreadsheets.values.get(
+    { spreadsheetId: sheetId, range },
+    { timeout: 10000 }
+  );
 
-  const rows = data.values;
+  const rows = response.data.values;
   if (!rows || rows.length < 2) return [];
 
   const resultado = rows.slice(1).map(row => ({
@@ -333,19 +329,6 @@ function smartFuelEstaEscalado(valor) {
   return false;
 }
 
-function montarUrl() {
-  const sheetId = process.env.GOOGLE_SHEET_ID;
-  const sheetName = process.env.SHEET_NAME;
-  const apiKey = process.env.GOOGLE_API_KEY;
-
-  if (!sheetId || !sheetName || !apiKey) {
-    throw new Error('Variáveis GOOGLE_SHEET_ID, SHEET_NAME e GOOGLE_API_KEY são obrigatórias no .env');
-  }
-
-  const range = `${encodeURIComponent(sheetName)}!B:Q`;
-  return `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
-}
-
 // Delegates to minutosAteHorario (already timezone-aware for America/Sao_Paulo)
 // so there is no separate timezone logic to maintain here.
 function minutosDesdeHorario(horario) {
@@ -372,19 +355,16 @@ function deveRemoverPorCalco(calco) {
 }
 
 async function getRestituicaoBag() {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error('GOOGLE_API_KEY não definida');
-
   const sheetId = '11sPIGtgxFgMkb1aEOAWA_kdugs8rKfyFJFNYyCzpoHE';
-  const range = encodeURIComponent('OPERACAO_DIA') + '!A:Z';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}&t=${Date.now()}`;
+  const range = 'OPERACAO_DIA!A:Z';
+  const sheets = getGoogleSheetsServiceClient();
 
-  const { data } = await axios.get(url, {
-    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
-    timeout: 10000,
-  });
+  const response = await sheets.spreadsheets.values.get(
+    { spreadsheetId: sheetId, range },
+    { timeout: 10000 }
+  );
 
-  const rows = data.values;
+  const rows = response.data.values;
   if (!rows || rows.length < 2) return [];
 
   return rows.slice(1).map(row => {
@@ -436,10 +416,18 @@ async function getMonitorChegada() {
 }
 
 async function getVoos() {
-  const url = montarUrl();
+  const sheetId = process.env.GOOGLE_SHEET_ID;
+  const sheetName = process.env.SHEET_NAME;
+
+  if (!sheetId || !sheetName) {
+    throw new Error('Variáveis GOOGLE_SHEET_ID e SHEET_NAME são obrigatórias no .env');
+  }
+
+  const range = `${sheetName}!B:Q`;
+  const sheets = getGoogleSheetsServiceClient();
 
 const [progResult, limpezaResult, smartFuelResult, monitorResult, restituicaoResult] = await Promise.allSettled([
-  axios.get(url, { headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }, timeout: 10000 }),
+  sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range }, { timeout: 10000 }),
   getLimpeza(),
   getSmartFuel(),
   getMonitorChegada(),
@@ -706,4 +694,4 @@ return {
   return voos;
 }
 
-module.exports = { montarUrl, getVoos };
+module.exports = { getVoos };
