@@ -46,6 +46,12 @@ function createProviders(env = process.env, logger = console) {
     logger.warn('[providers] REST. API solicitada, mas não configurada; linha REST. ficará cinza.');
   }
 
+  const realFonia = new FoniaProvider({
+    url: env.FONIA_API_URL,
+    apiKey: env.INTEGRACAO_API_KEY_CHEGADA,
+    timeoutMs,
+  });
+
   const wingletClient = new WingletClient({
     baseUrl: env.WINGLET_API_BASE_URL || 'https://winglet.app/api',
     apiKey: env.WINGLET_API_KEY,
@@ -59,12 +65,12 @@ function createProviders(env = process.env, logger = console) {
 
   return {
     malha: useMock ? mock : realMalha,
-    fonia: useMock ? mock : new FoniaProvider(),
+    fonia: useMock ? mock : realFonia,
     rest: useRealRest ? realRest : useMock ? mock : new RestProvider(),
     smartFuel,
     modes: {
       malha: useMock ? 'mock-explicit' : realMalha.isConfigured() ? 'siga' : 'siga-unconfigured',
-      fonia: useMock ? 'mock-explicit' : 'nao-integrada',
+      fonia: useMock ? 'mock-explicit' : realFonia.isConfigured() ? 'api' : 'nao-integrada',
       rest: restMode,
       smartFuel: smartFuel.isConfigured() ? 'winglet' : 'winglet-unconfigured',
     },

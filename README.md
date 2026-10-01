@@ -73,11 +73,15 @@ do Retiradas e são tratados como Narrow.
 
 ## Outros providers
 
-Hoje **somente SMARTF** sinaliza cores. As demais cadeiras ficam **cinza (sem
+Hoje **FONIA e SMARTF** sinalizam cores. As demais cadeiras ficam **cinza (sem
 sinal)** até a API correspondente entrar — nunca amarelo/vermelho por falta de
 integração:
 
-- FONIA: não integrada (`FoniaProvider.isConfigured() === false`); linha cinza.
+- FONIA: API de escalados do WFS-FONIA (`GET {FONIA_API_URL}?data=YYYY-MM-DD`,
+  header `x-api-key` = `INTEGRACAO_API_KEY_CHEGADA`), casada por data + voo da
+  chegada (ETA de madrugada também consulta a véspera). Cores: azul = escalado
+  (nome da equipe no quadro), verde = na posição, amarelo ≤ 15 min e vermelho
+  ≤ 5 min sem escala, cinza fora da janela. Registro `cancelado` é ignorado.
 - REST.: cinza, exceto com `REST_PROVIDER=api` e `REST_API_BASE_URL`.
 - LIMPEZA, QTU e QTA: cinzas e vazias.
 - SMARTF consulta a Winglet pelo backend, cruza somente chegadas da mesma data
