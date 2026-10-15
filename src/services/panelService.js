@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildServiceKey, selectEligibleArrivals } = require('../domain/panelRules');
+const { buildServiceKey, selectPanelCandidates, selectPanelArrivals } = require('../domain/panelRules');
 
 // Por quanto tempo o último estado válido de um enriquecimento é reaproveitado
 // após falhas consecutivas. Depois disso a linha volta para cinza (sem sinal),
@@ -57,14 +57,19 @@ function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = 
       ...flight,
       serviceKey: flight.serviceKey || buildServiceKey(flight.eta, flight.flightNumber.replace(/^\D+/, '')),
     }));
-    const eligible = selectEligibleArrivals(normalizedArrivals, now);
+    const candidates = selectPanelCandidates(normalizedArrivals, now);
 
-    const [fonia, rest, smartFuel] = await Promise.all([
-      enrichment('fonia', 'Fonia', providers.fonia, () => providers.fonia.getAssignments(eligible, now), nowMs),
+    // A Fonia é consultada antes da seleção final: voo cuja equipe ainda não
+    // apertou "na posição" fica travado no painel mesmo após ETA/calço/porta.
+    const fonia = await enrichment('fonia', 'Fonia', providers.fonia, () => providers.fonia.getAssignments(candidates, now), nowMs);
+    const foniaByOperation = mapBy(fonia.items, 'operationId');
+    const eligible = selectPanelArrivals(candidates, now, (flight) =>
+      fonia.available && !foniaByOperation.get(flight.id)?.inPosition);
+
+    const [rest, smartFuel] = await Promise.all([
       enrichment('rest', 'REST.', providers.rest, () => providers.rest.getStatuses(eligible, now), nowMs),
       enrichment('smartFuel', 'Smart Fuel', providers.smartFuel, () => providers.smartFuel.getStatuses(eligible, now), nowMs),
     ]);
-    const foniaByOperation = mapBy(fonia.items, 'operationId');
     const restByKey = mapBy(rest.items, 'serviceKey');
     const smartFuelByOperation = mapBy(smartFuel.items, 'operationId');
 

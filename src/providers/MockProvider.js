@@ -50,6 +50,9 @@ class MockProvider {
       ['mock-arrival-assigned', { teamName: 'ALFA - T3', inPosition: false }],
       ['mock-arrival-position', { teamName: 'BRAVO - T3', inPosition: true }],
       ['mock-arrival-assigned-2', { teamName: 'DELTA - T3', inPosition: false }],
+      // Calçado/porta aberta com equipe na posição: saem do painel normalmente.
+      ['mock-hidden-chocked', { teamName: 'ECHO - T3', inPosition: true }],
+      ['mock-hidden-door-open', { teamName: 'GOLF - T3', inPosition: true }],
     ]);
 
     return arrivals.map((flight) => ({

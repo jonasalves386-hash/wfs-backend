@@ -171,3 +171,58 @@ test('cores FONIA no painel: cinza, amarelo, vermelho, azul com equipe e verde n
   });
   assert.ok(panel.every((flight) => flight.fonia.integrated === true));
 });
+
+test('trava no painel voo sem "na posição" após ETA, calço ou porta; sai quando aperta', async () => {
+  let inPosition = false;
+  const providers = {
+    malha: {
+      getArrivals: async () => [
+        arrival('passou', 'LA10', -20),
+        arrival('calcou', 'LA11', -5, { chocksOn: true }),
+        arrival('porta', 'LA12', 2, { gateOpen: true }),
+        arrival('antigo', 'LA13', -200),
+        arrival('normal', 'LA14', 30),
+      ],
+    },
+    fonia: {
+      isConfigured: () => true,
+      getAssignments: async (flights) => flights.map((flight) => ({
+        operationId: flight.id,
+        teamName: 'ALFA - T1',
+        inPosition: flight.id === 'calcou' ? true : inPosition,
+      })),
+    },
+  };
+  const service = createPanelService(providers, silent);
+
+  const first = await service.getPanelFlights(NOW);
+  assert.deepEqual(first.map((flight) => [flight.id, flight.held]), [
+    ['passou', true],
+    ['porta', true],
+    ['normal', false],
+  ]);
+
+  inPosition = true;
+  const second = await service.getPanelFlights(NOW);
+  assert.deepEqual(second.map((flight) => flight.id), ['normal']);
+});
+
+test('Fonia fora do ar não trava voos (volta à regra normal)', async () => {
+  const providers = {
+    malha: { getArrivals: async () => [arrival('passou', 'LA10', -20), arrival('normal', 'LA14', 30)] },
+    fonia: { isConfigured: () => true, getAssignments: async () => { throw new Error('fora'); } },
+  };
+  const panel = await createPanelService(providers, silent).getPanelFlights(NOW);
+  assert.deepEqual(panel.map((flight) => flight.id), ['normal']);
+});
+
+test('frontend mantém voo travado e mostra atraso negativo', () => {
+  const nowMs = NOW.getTime();
+  const flights = [
+    { eta: new Date(nowMs - 20 * 60000).toISOString(), held: true, onChock: true },
+    { eta: new Date(nowMs - 20 * 60000).toISOString(), held: false },
+    { eta: new Date(nowMs + 10 * 60000).toISOString(), held: false },
+  ];
+  assert.equal(PanelRules.visibleFlights(flights, nowMs).length, 2);
+  assert.equal(PanelRules.minutesUntil(flights[0].eta, nowMs), -20);
+});
