@@ -69,7 +69,7 @@ test('serviço não integrado não é chamado e sai como integrated=false', asyn
   };
   const [flight] = await createPanelService(providers, silent).getPanelFlights(NOW);
   assert.deepEqual(flight.fonia, { integrated: false, teamName: '', inPosition: false });
-  assert.deepEqual(flight.rest, { integrated: false, assigned: false });
+  assert.deepEqual(flight.rest, { integrated: false, assigned: false, operatorName: '' });
   assert.equal(flight.smartFuel.integrated, true);
   assert.equal(flight.smartFuel.teamName, 'JONAS - T3');
 });

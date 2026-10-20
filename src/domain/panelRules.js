@@ -6,6 +6,8 @@ const MAX_FLIGHTS = 12;
 // Voo travado (sem "na posição" na Fonia) fica no painel por no máximo este
 // tempo após o ETA, para um registro esquecido não ocupar a tela para sempre.
 const HOLD_MAX_MINUTES = 180;
+// REST. sem escala segura o voo após o ETA por menos tempo, para não ocupar as 12 posições.
+const REST_HOLD_MAX_MINUTES = 60;
 // Status SIGA da perna de chegada que indicam voo cancelado.
 const CANCELLED_STATUSES = new Set(['C']);
 const { filterNarrowBody } = require('./wideBodyPrefixes');
@@ -77,8 +79,13 @@ function foniaColor(assignment, minutes) {
   return pendingColor(minutes);
 }
 
+// REST.: azul escalado; sem escala, amarelo piscando a <= 5 min, vermelho
+// piscando com o ETA zerado; cinza antes disso.
 function restColor(status, minutes) {
-  return status?.assigned ? 'blue' : pendingColor(minutes);
+  if (status?.assigned) return 'blue';
+  if (minutes <= 0) return 'red';
+  if (minutes <= 5) return 'yellow-blink';
+  return 'gray';
 }
 
 function saoPauloDateKey(value) {
@@ -111,6 +118,7 @@ module.exports = {
   WINDOW_MINUTES,
   MAX_FLIGHTS,
   HOLD_MAX_MINUTES,
+  REST_HOLD_MAX_MINUTES,
   CANCELLED_STATUSES,
   timestamp,
   isCancelled,

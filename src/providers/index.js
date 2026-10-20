@@ -4,6 +4,7 @@ const path = require('path');
 const { MalhaProvider } = require('./MalhaProvider');
 const { RestProvider } = require('./RestProvider');
 const { FoniaProvider } = require('./FoniaProvider');
+const { RestituicaoProvider } = require('./RestituicaoProvider');
 const { MockProvider } = require('./MockProvider');
 const { SigaClient } = require('./SigaClient');
 const { WingletClient } = require('./WingletClient');
@@ -45,6 +46,16 @@ function createProviders(env = process.env, logger = console) {
   if (env.REST_PROVIDER === 'api' && !useRealRest) {
     logger.warn('[providers] REST. API solicitada, mas não configurada; linha REST. ficará cinza.');
   }
+  // REST_PROVIDER=restituicao: fila do WFS-RESTITUIÇÃO (data + voo).
+  const restituicao = new RestituicaoProvider({
+    url: env.RESTITUICAO_API_URL,
+    apiKey: env.RESTITUICAO_API_KEY,
+    timeoutMs,
+  });
+  const useRestituicao = env.REST_PROVIDER === 'restituicao' && restituicao.isConfigured();
+  if (env.REST_PROVIDER === 'restituicao' && !useRestituicao) {
+    logger.warn('[providers] Restituição solicitada, mas não configurada; linha REST. ficará cinza.');
+  }
 
   const realFonia = new FoniaProvider({
     url: env.FONIA_API_URL,
@@ -60,13 +71,14 @@ function createProviders(env = process.env, logger = console) {
   const smartFuel = new SmartFuelProvider({ client: wingletClient, logger });
 
   let restMode = 'nao-integrada';
-  if (useRealRest) restMode = 'api';
+  if (useRestituicao) restMode = 'restituicao';
+  else if (useRealRest) restMode = 'api';
   else if (useMock) restMode = 'mock-explicit';
 
   return {
     malha: useMock ? mock : realMalha,
     fonia: useMock ? mock : realFonia,
-    rest: useRealRest ? realRest : useMock ? mock : new RestProvider(),
+    rest: useRestituicao ? restituicao : useRealRest ? realRest : useMock ? mock : new RestProvider(),
     smartFuel,
     modes: {
       malha: useMock ? 'mock-explicit' : realMalha.isConfigured() ? 'siga' : 'siga-unconfigured',

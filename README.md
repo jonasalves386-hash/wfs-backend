@@ -82,7 +82,13 @@ integração:
   chegada (ETA de madrugada também consulta a véspera). Cores: azul = escalado
   (nome da equipe no quadro), verde = na posição, amarelo ≤ 15 min e vermelho
   ≤ 5 min sem escala, cinza fora da janela. Registro `cancelado` é ignorado.
-- REST.: cinza, exceto com `REST_PROVIDER=api` e `REST_API_BASE_URL`.
+- REST.: fila do WFS-RESTITUIÇÃO com `REST_PROVIDER=restituicao`
+  (`GET {RESTITUICAO_API_URL}?data=YYYY-MM-DD`, header `x-api-key` =
+  `RESTITUICAO_API_KEY`), casada por data + voo (madrugada consulta a véspera).
+  Azul = escalado (nome do operador/equipe), amarelo piscando ≤ 5 min e
+  vermelho piscando com ETA zerado sem escala, cinza antes disso. Voo sem
+  registro na Restituição = cinza. Sem escala, o voo fica no painel até 60 min
+  após o ETA.
 - LIMPEZA, QTU e QTA: cinzas e vazias.
 - SMARTF consulta a Winglet pelo backend, cruza somente chegadas da mesma data
   operacional/trecho. Em falha, reaproveita o último estado válido por até

@@ -65,9 +65,11 @@ test('aplica as prioridades de cor da Fonia', () => {
 
 test('aplica as cores da REST.', () => {
   assert.equal(restColor({ assigned: true }, 30), 'blue');
-  assert.equal(restColor({ assigned: false }, 5), 'red');
-  assert.equal(restColor({ assigned: false }, 15), 'yellow');
-  assert.equal(restColor({ assigned: false }, 16), 'gray');
+  assert.equal(restColor({ assigned: false }, 0), 'red');
+  assert.equal(restColor({ assigned: false }, -10), 'red');
+  assert.equal(restColor({ assigned: false }, 5), 'yellow-blink');
+  assert.equal(restColor({ assigned: false }, 1), 'yellow-blink');
+  assert.equal(restColor({ assigned: false }, 6), 'gray');
 });
 
 test('gera a chave operacional usada pela REST. no fuso de São Paulo', () => {

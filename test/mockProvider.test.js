@@ -22,5 +22,5 @@ test('mock cobre todos os cenários visuais e oculta calço/porta aberta', async
   assert.deepEqual(foniaColors, new Set(['red', 'yellow', 'blue', 'green', 'gray']));
 
   const restColors = new Set(panel.map((item) => restColor(item.rest, minutesUntil(item.eta, now))));
-  assert.deepEqual(restColors, new Set(['red', 'yellow', 'gray', 'blue']));
+  assert.deepEqual(restColors, new Set(['yellow-blink', 'gray', 'blue']));
 });
