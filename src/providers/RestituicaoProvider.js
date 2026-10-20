@@ -31,7 +31,8 @@ function adaptRestituicaoRecord(record) {
   const flightNumber = normalizeFlightNumber(record.voo);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !flightNumber) return null;
 
-  const operatorName = text(record.operador) || text(record.equipe);
+  // Só o operador do trator: `equipe` é a equipe da Fonia e não deve aparecer na REST.
+  const operatorName = text(record.operador);
   const assigned = record.escalado === true;
   return {
     date,

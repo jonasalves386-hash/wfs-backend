@@ -51,10 +51,9 @@ function providerReturning(byDate, calls = []) {
   });
 }
 
-test('adapter: operador, depois equipe, depois "ESCALADO"; não escalado sem nome', () => {
+test('adapter: operador ou "ESCALADO" (nunca a equipe da Fonia); não escalado sem nome', () => {
   assert.equal(adaptRestituicaoRecord(record({ operador: 'JOAO - TRATOR' })).operatorName, 'JOAO - TRATOR');
-  assert.equal(adaptRestituicaoRecord(record()).operatorName, 'DIAMANTE - T3');
-  assert.equal(adaptRestituicaoRecord(record({ equipe: null })).operatorName, 'ESCALADO');
+  assert.equal(adaptRestituicaoRecord(record()).operatorName, 'ESCALADO');
   const aguardando = adaptRestituicaoRecord(record({ status: 'AGUARDANDO', escalado: false, equipe: null }));
   assert.equal(aguardando.assigned, false);
   assert.equal(aguardando.operatorName, '');
@@ -74,7 +73,7 @@ test('consulta ?data= com x-api-key e casa por data + voo; sem registro = found:
   assert.equal(new URL(calls[0].url).searchParams.get('data'), '2026-10-20');
   assert.equal(calls[0].options.headers['x-api-key'], 'chave-de-teste');
   assert.deepEqual(result.map((item) => [item.found, item.assigned, item.operatorName, item.holdUntilAssigned]), [
-    [true, true, 'DIAMANTE - T3', true],
+    [true, true, 'ESCALADO', true],
     [true, false, '', true],
     [false, false, '', true],
   ]);
@@ -85,7 +84,7 @@ test('dia anterior: ETA de 00:20 casa com a fila da véspera', async () => {
   const provider = providerReturning({ '2026-10-20': [record()] });
   const [result] = await provider.getStatuses([flight]);
   assert.equal(result.found, true);
-  assert.equal(result.operatorName, 'DIAMANTE - T3');
+  assert.equal(result.operatorName, 'ESCALADO');
 });
 
 test('erro HTTP e timeout viram erro tipado sem vazar a chave', async () => {
