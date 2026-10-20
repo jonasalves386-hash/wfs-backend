@@ -226,3 +226,19 @@ test('frontend mantém voo travado e mostra atraso negativo', () => {
   assert.equal(PanelRules.visibleFlights(flights, nowMs).length, 2);
   assert.equal(PanelRules.minutesUntil(flights[0].eta, nowMs), -20);
 });
+
+test('equipe TRASLADO não trava o voo no painel', async () => {
+  const providers = {
+    malha: { getArrivals: async () => [arrival('traslado', 'LA20', -30), arrival('alfa', 'LA21', -30)] },
+    fonia: {
+      isConfigured: () => true,
+      getAssignments: async (flights) => flights.map((flight) => ({
+        operationId: flight.id,
+        teamName: flight.id === 'traslado' ? 'TRASLADO' : 'ALFA - T1',
+        inPosition: false,
+      })),
+    },
+  };
+  const panel = await createPanelService(providers, silent).getPanelFlights(NOW);
+  assert.deepEqual(panel.map((flight) => flight.id), ['alfa']);
+});

@@ -11,6 +11,11 @@ function mapBy(items, key) {
   return new Map(items.map((item) => [item[key], item]));
 }
 
+// Escala de traslado não tem botão "na posição": não trava o painel.
+function holdsForFonia(assignment) {
+  return !/^TRASLADO\b/i.test(String(assignment?.teamName || '').trim()) && !assignment?.inPosition;
+}
+
 function isIntegrated(provider) {
   if (!provider) return false;
   return typeof provider.isConfigured === 'function' ? provider.isConfigured() : true;
@@ -69,7 +74,7 @@ function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = 
     const foniaByOperation = mapBy(fonia.items, 'operationId');
     const restByKey = mapBy(rest.items, 'serviceKey');
     const eligible = selectPanelArrivals(candidates, now, (flight) =>
-      fonia.available && !foniaByOperation.get(flight.id)?.inPosition);
+      fonia.available && holdsForFonia(foniaByOperation.get(flight.id)));
 
     const smartFuel = await enrichment('smartFuel', 'Smart Fuel', providers.smartFuel, () => providers.smartFuel.getStatuses(eligible, now), nowMs);
     const smartFuelByOperation = mapBy(smartFuel.items, 'operationId');
