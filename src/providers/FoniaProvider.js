@@ -1,6 +1,7 @@
 'use strict';
 
 const { saoPauloDateKey } = require('../domain/panelRules');
+const { stairsRequiredFor } = require('../domain/stairsRule');
 
 // Fallback para quando a `data` da Fonia não coincide com a data do ETA da
 // Malha (ex.: voo previsto para 23:50 que atrasou para 00:20).
@@ -60,6 +61,13 @@ function adaptFoniaRecord(record) {
     inPosition: escalado && (record.na_posicao === true || record.iniciada === true || record.finalizada === true),
     equipment: adaptEquipment(record),
   };
+}
+
+// A Fonia só informa `escada_necessaria` depois do checklist salvo; antes
+// disso vale a regra da posição/origem calculada pelo painel.
+function withStairsRule(equipment, flight) {
+  if (equipment.stairs.required !== null) return equipment;
+  return { ...equipment, stairs: { ...equipment.stairs, required: stairsRequiredFor(flight) } };
 }
 
 function boolOrNull(value) {
@@ -194,7 +202,7 @@ class FoniaProvider {
         teamName: record?.teamName || '',
         inPosition: Boolean(record?.inPosition),
         // Sem registro na Fonia não há como saber escada/conveyor: sem sinal.
-        equipment: record?.equipment || null,
+        equipment: record ? withStairsRule(record.equipment, flight) : null,
       };
     });
   }

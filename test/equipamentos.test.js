@@ -102,3 +102,41 @@ test('trava de escada/conveyor vale só até 30 min após o ETA', async () => {
   // 'passou' (-15) fica travado; 'antigo' (-31) já saiu.
   assert.deepEqual(panel.map((flight) => flight.id), ['passou', 'futuro']);
 });
+
+test('regra da escada pela posição e origem', () => {
+  const { stairsRequiredFor } = require('../src/domain/stairsRule');
+  const at = (box, origin = 'BSB') => stairsRequiredFor({ box, origin });
+  assert.equal(at('114'), true);   // Ilha
+  assert.equal(at('203L'), true);  // Pátio 100
+  assert.equal(at('207'), false);  // T2 Oeste
+  assert.equal(at('306R'), false);
+  assert.equal(at('406'), false);  // T2 Leste
+  assert.equal(at('411R'), true);  // MOP
+  assert.equal(at('507', 'BSB'), true);  // T3 nacional
+  assert.equal(at('550', 'EZE'), null);  // T3 internacional: depende da saída
+  assert.equal(at('620'), true);   // Pátios 6/7
+  assert.equal(at('715'), true);
+  assert.equal(at('716'), null);
+  assert.equal(at('101'), null);
+  assert.equal(at(''), null);
+});
+
+test('sem checklist a escada usa a regra; com escada_necessaria da Fonia vale a Fonia', async () => {
+  const { FoniaProvider } = require('../src/providers/FoniaProvider');
+  const records = [
+    { voo: '1', data: '2026-10-20', escalado: true, equipe: { nome: 'A' }, na_posicao: true, checklist: null },
+    { voo: '2', data: '2026-10-20', escalado: true, equipe: { nome: 'B' }, na_posicao: true,
+      checklist: { escada: null, escada_necessaria: false, conveyor: null, prancha: null } },
+  ];
+  const provider = new FoniaProvider({
+    url: 'https://fonia.example/x', apiKey: 'k',
+    fetchImpl: async () => ({ status: 200, json: async () => records }),
+  });
+  const eta = new Date(NOW.getTime() + 10 * 60000).toISOString();
+  const [rule, fonia] = await provider.getAssignments([
+    { id: 'a', flightNumber: 'LA1', eta, box: '411R', origin: 'BSB' },
+    { id: 'b', flightNumber: 'LA2', eta, box: '411R', origin: 'BSB' },
+  ]);
+  assert.equal(rule.equipment.stairs.required, true);
+  assert.equal(fonia.equipment.stairs.required, false);
+});
