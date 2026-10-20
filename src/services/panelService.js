@@ -1,6 +1,9 @@
 'use strict';
 
-const { buildServiceKey, selectPanelCandidates, selectPanelArrivals } = require('../domain/panelRules');
+const {
+  buildServiceKey, selectPanelCandidates, selectPanelArrivals, equipmentPending, minutesUntil,
+  EQUIPMENT_HOLD_MAX_MINUTES,
+} = require('../domain/panelRules');
 
 // Por quanto tempo o último estado válido de um enriquecimento é reaproveitado
 // após falhas consecutivas. Depois disso a linha volta para cinza (sem sinal),
@@ -11,9 +14,14 @@ function mapBy(items, key) {
   return new Map(items.map((item) => [item[key], item]));
 }
 
-// Escala de traslado não tem botão "na posição": não trava o painel.
-function holdsForFonia(assignment) {
-  return !/^TRASLADO\b/i.test(String(assignment?.teamName || '').trim()) && !assignment?.inPosition;
+// Trava pela Fonia (escala de traslado não trava):
+// - equipe sem "na posição": até HOLD_MAX_MINUTES após o ETA;
+// - escada/conveyor obrigatório sem confirmação: até EQUIPMENT_HOLD_MAX_MINUTES.
+function holdsForFonia(assignment, flight, now) {
+  if (/^TRASLADO\b/i.test(String(assignment?.teamName || '').trim())) return false;
+  if (!assignment?.inPosition) return true;
+  return equipmentPending(assignment?.equipment)
+    && minutesUntil(flight.eta, now) >= -EQUIPMENT_HOLD_MAX_MINUTES;
 }
 
 function isIntegrated(provider) {
@@ -74,7 +82,7 @@ function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = 
     const foniaByOperation = mapBy(fonia.items, 'operationId');
     const restByKey = mapBy(rest.items, 'serviceKey');
     const eligible = selectPanelArrivals(candidates, now, (flight) =>
-      fonia.available && holdsForFonia(foniaByOperation.get(flight.id)));
+      fonia.available && holdsForFonia(foniaByOperation.get(flight.id), flight, now));
 
     const smartFuel = await enrichment('smartFuel', 'Smart Fuel', providers.smartFuel, () => providers.smartFuel.getStatuses(eligible, now), nowMs);
     const smartFuelByOperation = mapBy(smartFuel.items, 'operationId');
@@ -89,6 +97,11 @@ function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = 
           integrated: fonia.available,
           teamName: assignment?.teamName || '',
           inPosition: Boolean(assignment?.inPosition),
+        },
+        stairs: { integrated: fonia.available, ...(assignment?.equipment?.stairs || { required: null, confirmed: false }) },
+        conveyor: {
+          integrated: fonia.available,
+          ...(assignment?.equipment?.conveyor || { required: null, confirmed: false, label: '' }),
         },
         rest: {
           integrated: rest.available && restStatus?.found !== false,

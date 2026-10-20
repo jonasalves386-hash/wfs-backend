@@ -58,6 +58,37 @@ function adaptFoniaRecord(record) {
     teamName: escalado ? teamName || 'ESCALADO' : '',
     // Botão "na posição" apertado; iniciada/finalizada implicam que a equipe já chegou.
     inPosition: escalado && (record.na_posicao === true || record.iniciada === true || record.finalizada === true),
+    equipment: adaptEquipment(record),
+  };
+}
+
+function boolOrNull(value) {
+  return value === true || value === false ? value : null;
+}
+
+/**
+ * Escada e conveyor do checklist da chegada (WFS-FONIA, objeto `checklist`,
+ * null até a equipe salvar no mobile).
+ * - ESCADA: obrigatória conforme `escada_necessaria` (regra da posição). Null =
+ *   regra desconhecida → sem sinal. Confirmada com `escada === true`.
+ * - CONVEYOR: obrigatório em toda posição, exceto quando a prancha está
+ *   marcada (prancha substitui o conveyor). Confirmado com conveyor ou prancha.
+ */
+function adaptEquipment(record) {
+  const checklist = record.checklist && typeof record.checklist === 'object' ? record.checklist : null;
+  const stairsRequired = boolOrNull(checklist?.escada_necessaria ?? record.escada_necessaria);
+  const plank = checklist?.prancha === true;
+  const conveyor = checklist?.conveyor === true;
+  return {
+    stairs: {
+      required: stairsRequired,
+      confirmed: checklist?.escada === true,
+    },
+    conveyor: {
+      required: true,
+      confirmed: conveyor || plank,
+      label: plank ? 'PRANCHA' : conveyor ? text(checklist?.conveyor_numero) || 'CONVEYOR' : '',
+    },
   };
 }
 
@@ -162,6 +193,8 @@ class FoniaProvider {
         leg: 'ARRIVAL',
         teamName: record?.teamName || '',
         inPosition: Boolean(record?.inPosition),
+        // Sem registro na Fonia não há como saber escada/conveyor: sem sinal.
+        equipment: record?.equipment || null,
       };
     });
   }

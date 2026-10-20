@@ -6,6 +6,8 @@ const MAX_FLIGHTS = 12;
 // Voo travado (sem "na posição" na Fonia) fica no painel por no máximo este
 // tempo após o ETA, para um registro esquecido não ocupar a tela para sempre.
 const HOLD_MAX_MINUTES = 180;
+// Escada/conveyor obrigatório sem confirmação trava por no máximo 30 min após o ETA.
+const EQUIPMENT_HOLD_MAX_MINUTES = 30;
 // Status SIGA da perna de chegada que indicam voo cancelado.
 const CANCELLED_STATUSES = new Set(['C']);
 const { filterNarrowBody } = require('./wideBodyPrefixes');
@@ -86,6 +88,21 @@ function restColor(status, minutes) {
   return 'gray';
 }
 
+// ESCADA/CONVEYOR: verde confirmado; pendente amarelo <= 10 min e vermelho
+// piscando <= 5 min; cinza antes disso, quando não obrigatório ou sem dado.
+function equipmentColor(item, minutes) {
+  if (!item || item.required !== true) return 'gray';
+  if (item.confirmed) return 'green';
+  if (minutes <= 5) return 'red';
+  if (minutes <= 10) return 'yellow';
+  return 'gray';
+}
+
+// Equipamento obrigatório e não confirmado trava o voo no painel.
+function equipmentPending(equipment) {
+  return ['stairs', 'conveyor'].some((key) => equipment?.[key]?.required === true && !equipment[key].confirmed);
+}
+
 function saoPauloDateKey(value) {
   if (value === null || value === undefined || value === '') return '';
   const date = value instanceof Date ? value : new Date(value);
@@ -116,6 +133,7 @@ module.exports = {
   WINDOW_MINUTES,
   MAX_FLIGHTS,
   HOLD_MAX_MINUTES,
+  EQUIPMENT_HOLD_MAX_MINUTES,
   CANCELLED_STATUSES,
   timestamp,
   isCancelled,
@@ -127,6 +145,8 @@ module.exports = {
   pendingColor,
   foniaColor,
   restColor,
+  equipmentColor,
+  equipmentPending,
   saoPauloDateKey,
   normalizeServiceFlightNumber,
   buildServiceKey,
