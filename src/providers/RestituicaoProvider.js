@@ -15,6 +15,18 @@ function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();
 }
 
+// Voo que atrasou depois da meia-noite: casa pela proximidade do STA.
+const CROSS_DAY_TOLERANCE_MS = 6 * 60 * 60 * 1000;
+
+function normalizeCode(value) {
+  return text(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function timestamp(value) {
+  const parsed = Date.parse(text(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function previousDateKey(dateKey) {
   const date = new Date(`${dateKey}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - 1);
@@ -37,6 +49,8 @@ function adaptRestituicaoRecord(record) {
   return {
     date,
     flightNumber,
+    prefix: normalizeCode(record.prefixo),
+    sta: timestamp(record.sta),
     assigned,
     operatorName: assigned ? operatorName || 'ESCALADO' : '',
   };
@@ -46,12 +60,26 @@ function findRecord(records, flight) {
   const number = normalizeFlightNumber(flight.flightNumber);
   const date = saoPauloDateKey(flight.eta);
   if (!number || !date) return null;
+  const etaMs = timestamp(flight.eta);
   const sameFlight = records.filter((record) => record.flightNumber === number);
-  // Voo previsto 23:50 que atrasou para 00:20 continua na fila do dia anterior.
-  const candidates = sameFlight.filter((record) => record.date === date);
-  const fallback = sameFlight.filter((record) => record.date === previousDateKey(date));
-  const pool = candidates.length ? candidates : fallback;
-  return pool.find((record) => record.assigned) || pool[0] || null;
+  let pool = sameFlight.filter((record) => record.date === date);
+  // Voo previsto 23:50 que atrasou para 00:20 continua na fila do dia anterior:
+  // casa pelo STA próximo do ETA; sem STA, pela data da véspera.
+  if (!pool.length && etaMs !== null) {
+    pool = sameFlight.filter((record) => record.sta !== null && Math.abs(record.sta - etaMs) <= CROSS_DAY_TOLERANCE_MS);
+  }
+  if (!pool.length) pool = sameFlight.filter((record) => record.date === previousDateKey(date) && record.sta === null);
+  if (pool.length > 1) {
+    // Desempate: mesma aeronave; depois o STA mais próximo do ETA.
+    const prefix = normalizeCode(flight.aircraftPrefix);
+    const samePrefix = pool.filter((record) => prefix && record.prefix === prefix);
+    if (samePrefix.length) pool = samePrefix;
+    if (etaMs !== null) {
+      pool = [...pool].sort((a, b) => (a.sta === null ? Infinity : Math.abs(a.sta - etaMs))
+        - (b.sta === null ? Infinity : Math.abs(b.sta - etaMs)));
+    }
+  }
+  return pool[0] || null;
 }
 
 class RestituicaoProvider {
@@ -113,8 +141,6 @@ class RestituicaoProvider {
         found: Boolean(record),
         assigned: Boolean(record?.assigned),
         operatorName: record?.operatorName || '',
-        // Sem escala, o voo fica no painel após o ETA (vermelho) até ser escalado.
-        holdUntilAssigned: true,
       };
     });
   }

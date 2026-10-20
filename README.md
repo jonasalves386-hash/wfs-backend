@@ -87,8 +87,8 @@ integração:
   `RESTITUICAO_API_KEY`), casada por data + voo (madrugada consulta a véspera).
   Azul = escalado (nome do operador/equipe), amarelo piscando ≤ 5 min e
   vermelho piscando com ETA zerado sem escala, cinza antes disso. Voo sem
-  registro na Restituição = cinza. Sem escala, o voo fica no painel até 60 min
-  após o ETA.
+  registro na Restituição = cinza. A REST. não trava o painel: só a Fonia
+  segura voo na tela.
 - LIMPEZA, QTU e QTA: cinzas e vazias.
 - SMARTF consulta a Winglet pelo backend, cruza somente chegadas da mesma data
   operacional/trecho. Em falha, reaproveita o último estado válido por até

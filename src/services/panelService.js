@@ -1,8 +1,6 @@
 'use strict';
 
-const {
-  buildServiceKey, selectPanelCandidates, selectPanelArrivals, minutesUntil, REST_HOLD_MAX_MINUTES,
-} = require('../domain/panelRules');
+const { buildServiceKey, selectPanelCandidates, selectPanelArrivals } = require('../domain/panelRules');
 
 // Por quanto tempo o último estado válido de um enriquecimento é reaproveitado
 // após falhas consecutivas. Depois disso a linha volta para cinza (sem sinal),
@@ -61,23 +59,17 @@ function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = 
     }));
     const candidates = selectPanelCandidates(normalizedArrivals, now);
 
-    // Fonia e REST. são consultadas nos candidatos, antes da seleção final:
-    // - Fonia: voo sem "na posição" fica travado mesmo após ETA/calço/porta;
-    // - REST. (provider com holdUntilAssigned): voo sem escala fica até
-    //   REST_HOLD_MAX_MINUTES após o ETA, para o vermelho aparecer.
+    // Fonia e REST. são consultadas nos candidatos, antes da seleção final.
+    // Só a Fonia trava o painel: voo sem "na posição" fica mesmo após
+    // ETA/calço/porta. A REST. apenas colore; nunca segura voo na tela.
     const [fonia, rest] = await Promise.all([
       enrichment('fonia', 'Fonia', providers.fonia, () => providers.fonia.getAssignments(candidates, now), nowMs),
       enrichment('rest', 'REST.', providers.rest, () => providers.rest.getStatuses(candidates, now), nowMs),
     ]);
     const foniaByOperation = mapBy(fonia.items, 'operationId');
     const restByKey = mapBy(rest.items, 'serviceKey');
-    const holdForRest = (flight) => {
-      const status = restByKey.get(flight.serviceKey);
-      if (!rest.available || !status?.holdUntilAssigned || status.found === false || status.assigned) return false;
-      return minutesUntil(flight.eta, now) >= -REST_HOLD_MAX_MINUTES;
-    };
     const eligible = selectPanelArrivals(candidates, now, (flight) =>
-      (fonia.available && !foniaByOperation.get(flight.id)?.inPosition) || holdForRest(flight));
+      fonia.available && !foniaByOperation.get(flight.id)?.inPosition);
 
     const smartFuel = await enrichment('smartFuel', 'Smart Fuel', providers.smartFuel, () => providers.smartFuel.getStatuses(eligible, now), nowMs);
     const smartFuelByOperation = mapBy(smartFuel.items, 'operationId');

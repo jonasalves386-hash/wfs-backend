@@ -72,10 +72,10 @@ test('consulta ?data= com x-api-key e casa por data + voo; sem registro = found:
   ]);
   assert.equal(new URL(calls[0].url).searchParams.get('data'), '2026-10-20');
   assert.equal(calls[0].options.headers['x-api-key'], 'chave-de-teste');
-  assert.deepEqual(result.map((item) => [item.found, item.assigned, item.operatorName, item.holdUntilAssigned]), [
-    [true, true, 'ESCALADO', true],
-    [true, false, '', true],
-    [false, false, '', true],
+  assert.deepEqual(result.map((item) => [item.found, item.assigned, item.operatorName]), [
+    [true, true, 'ESCALADO'],
+    [true, false, ''],
+    [false, false, ''],
   ]);
 });
 
@@ -121,32 +121,24 @@ function serviceWith(statusFor, malhaFlights) {
       isConfigured: () => true,
       getStatuses: async (flights) => flights.map((flight) => ({
         serviceKey: flight.serviceKey,
-        holdUntilAssigned: true,
         ...statusFor(flight),
       })),
     },
   }, silent);
 }
 
-test('REST. sem escala segura o voo após o ETA por até 60 min', async () => {
-  const panel = await serviceWith(() => ({ found: true, assigned: false, operatorName: '' }), [
-    arrival('passou-10', 'LA1', -10),
-    arrival('passou-70', 'LA2', -70),
-    arrival('futuro', 'LA3', 20),
-  ]).getPanelFlights(NOW);
-  assert.deepEqual(panel.map((flight) => [flight.id, flight.held]), [['passou-10', true], ['futuro', false]]);
-  assert.equal(PanelRules.restStatus(panel[0], NOW.getTime()), 'red');
-});
-
-test('REST. escalado ou sem registro não segura o voo', async () => {
-  const panel = await serviceWith((flight) => (flight.id === 'escalado'
-    ? { found: true, assigned: true, operatorName: 'DIAMANTE - T3' }
-    : { found: false, assigned: false, operatorName: '' }), [
-    arrival('escalado', 'LA1', -10),
-    arrival('sem-registro', 'LA2', -10),
-    arrival('futuro-escalado', 'LA3', 20),
-  ]).getPanelFlights(NOW);
-  assert.deepEqual(panel.map((flight) => flight.id), ['futuro-escalado']);
+test('REST. nunca trava o painel: sem escala, escalado ou sem registro saem após o ETA', async () => {
+  for (const status of [
+    { found: true, assigned: false, operatorName: '' },
+    { found: true, assigned: true, operatorName: 'ANA - TRATOR 5' },
+    { found: false, assigned: false, operatorName: '' },
+  ]) {
+    const panel = await serviceWith(() => status, [
+      arrival('passou', 'LA1', -10),
+      arrival('futuro', 'LA3', 20),
+    ]).getPanelFlights(NOW);
+    assert.deepEqual(panel.map((flight) => flight.id), ['futuro']);
+  }
 });
 
 test('payload expõe operatorName e found:false vira cinza', async () => {
@@ -175,4 +167,36 @@ test('cores REST. no frontend: cinza > 5 min, amarelo piscando <= 5, vermelho <=
   assert.equal(PanelRules.restStatus(at(0), nowMs), 'red');
   assert.equal(PanelRules.restStatus(at(-15), nowMs), 'red');
   assert.equal(PanelRules.restStatus(at(-15, true), nowMs), 'blue');
+});
+
+test('desempate por prefixo e STA; madrugada casa pelo STA da véspera', async () => {
+  const provider = providerReturning({
+    '2026-10-20': [
+      record({ prefixo: 'PRXXX', sta: '2026-10-20T15:10:00.000Z', operador: 'ERRADO - T1' }),
+      record({ prefixo: 'PRMAG', sta: '2026-10-20T15:10:00.000Z', operador: 'CERTO - T2' }),
+    ],
+  });
+  const [byPrefix] = await provider.getStatuses([arrival('a1', 'LA3255', 10)]);
+  assert.equal(byPrefix.operatorName, 'CERTO - T2');
+
+  const late = { ...arrival('a2', 'LA3255', 0), eta: '2026-10-21T03:20:00.000Z' }; // 00:20 SP
+  const night = providerReturning({
+    '2026-10-20': [record({ sta: '2026-10-21T02:50:00.000Z', operador: 'NOITE - T3' })],
+  });
+  const [crossDay] = await night.getStatuses([late]);
+  assert.equal(crossDay.operatorName, 'NOITE - T3');
+
+  const farAway = providerReturning({
+    '2026-10-20': [record({ sta: '2026-10-20T10:00:00.000Z', operador: 'LONGE - T1' })],
+  });
+  const [none] = await farAway.getStatuses([late]);
+  assert.equal(none.found, false);
+});
+
+test('cor decidida por escalado, não por status', () => {
+  const statusEscalado = adaptRestituicaoRecord(record({ status: 'ESCALADO', escalado: false, operador: null }));
+  assert.equal(statusEscalado.assigned, false);
+  const completo = adaptRestituicaoRecord(record({ status: 'CRÍTICO', escalado: true, operador: 'ANA - TRATOR 5' }));
+  assert.equal(completo.assigned, true);
+  assert.equal(completo.operatorName, 'ANA - TRATOR 5');
 });

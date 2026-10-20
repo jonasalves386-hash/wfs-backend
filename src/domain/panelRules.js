@@ -6,8 +6,6 @@ const MAX_FLIGHTS = 12;
 // Voo travado (sem "na posição" na Fonia) fica no painel por no máximo este
 // tempo após o ETA, para um registro esquecido não ocupar a tela para sempre.
 const HOLD_MAX_MINUTES = 180;
-// REST. sem escala segura o voo após o ETA por menos tempo, para não ocupar as 12 posições.
-const REST_HOLD_MAX_MINUTES = 60;
 // Status SIGA da perna de chegada que indicam voo cancelado.
 const CANCELLED_STATUSES = new Set(['C']);
 const { filterNarrowBody } = require('./wideBodyPrefixes');
@@ -118,7 +116,6 @@ module.exports = {
   WINDOW_MINUTES,
   MAX_FLIGHTS,
   HOLD_MAX_MINUTES,
-  REST_HOLD_MAX_MINUTES,
   CANCELLED_STATUSES,
   timestamp,
   isCancelled,
