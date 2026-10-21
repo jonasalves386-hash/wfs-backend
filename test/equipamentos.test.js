@@ -49,7 +49,7 @@ test('cores: verde confirmado; pendente cinza > 10, amarelo <= 10, vermelho <= 5
   assert.equal(PanelRules.equipmentStatus({ integrated: false, ...pending }, flight, nowMs), 'gray');
 });
 
-function service(equipmentFor) {
+function service(equipmentFor, holdEquipment = true) {
   const arrival = (id, minutes) => ({
     id, flightNumber: `LA${id.length}`, aircraftPrefix: 'PR-MAG', chocksOn: false, gateOpen: false, rawStatus: 'O',
     eta: new Date(NOW.getTime() + minutes * 60000).toISOString(),
@@ -62,7 +62,7 @@ function service(equipmentFor) {
         operationId: flight.id, teamName: 'ALFA - T1', inPosition: true, equipment: equipmentFor(flight),
       })),
     },
-  }, silent);
+  }, silent, { holdEquipment });
 }
 
 test('escada ou conveyor obrigatório sem confirmação trava o voo; confirmado libera', async () => {
@@ -139,4 +139,13 @@ test('sem checklist a escada usa a regra; com escada_necessaria da Fonia vale a 
   ]);
   assert.equal(rule.equipment.stairs.required, true);
   assert.equal(fonia.equipment.stairs.required, false);
+});
+
+test('trava de escada/conveyor desligada (padrão): alerta, mas não segura o voo', async () => {
+  const panel = await service(() => ({
+    stairs: { required: true, confirmed: false },
+    conveyor: { required: true, confirmed: false, label: '' },
+  }), false).getPanelFlights(NOW);
+  assert.deepEqual(panel.map((flight) => flight.id), ['futuro']);
+  assert.equal(panel[0].conveyor.required, true);
 });

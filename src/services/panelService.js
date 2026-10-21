@@ -16,11 +16,14 @@ function mapBy(items, key) {
 
 // Trava pela Fonia (escala de traslado não trava):
 // - equipe sem "na posição": até HOLD_MAX_MINUTES após o ETA;
-// - escada/conveyor obrigatório sem confirmação: até EQUIPMENT_HOLD_MAX_MINUTES.
-function holdsForFonia(assignment, flight, now) {
+// - escada/conveyor obrigatório sem confirmação: até EQUIPMENT_HOLD_MAX_MINUTES,
+//   só com a trava de equipamentos ligada (EQUIPMENT_HOLD=on). Desligada, as
+//   linhas ESCADA/CONVEYOR continuam alertando, mas não seguram o voo na tela.
+function holdsForFonia(assignment, flight, now, holdEquipment) {
   if (/^TRASLADO\b/i.test(String(assignment?.teamName || '').trim())) return false;
   if (!assignment?.inPosition) return true;
-  return equipmentPending(assignment?.equipment)
+  return holdEquipment
+    && equipmentPending(assignment?.equipment)
     && minutesUntil(flight.eta, now) >= -EQUIPMENT_HOLD_MAX_MINUTES;
 }
 
@@ -29,7 +32,10 @@ function isIntegrated(provider) {
   return typeof provider.isConfigured === 'function' ? provider.isConfigured() : true;
 }
 
-function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = ENRICHMENT_MAX_AGE_MS } = {}) {
+function createPanelService(providers, logger = console, {
+  maxEnrichmentAgeMs = ENRICHMENT_MAX_AGE_MS,
+  holdEquipment = process.env.EQUIPMENT_HOLD === 'on',
+} = {}) {
   const lastValid = {
     fonia: { items: [], at: 0 },
     rest: { items: [], at: 0 },
@@ -82,7 +88,7 @@ function createPanelService(providers, logger = console, { maxEnrichmentAgeMs = 
     const foniaByOperation = mapBy(fonia.items, 'operationId');
     const restByKey = mapBy(rest.items, 'serviceKey');
     const eligible = selectPanelArrivals(candidates, now, (flight) =>
-      fonia.available && holdsForFonia(foniaByOperation.get(flight.id), flight, now));
+      fonia.available && holdsForFonia(foniaByOperation.get(flight.id), flight, now, holdEquipment));
 
     const smartFuel = await enrichment('smartFuel', 'Smart Fuel', providers.smartFuel, () => providers.smartFuel.getStatuses(eligible, now), nowMs);
     const smartFuelByOperation = mapBy(smartFuel.items, 'operationId');
