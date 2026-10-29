@@ -199,6 +199,8 @@ class FoniaProvider {
       return {
         operationId: flight.id,
         leg: 'ARRIVAL',
+        // Voo que a Fonia não devolve (cancelado lá ou fora da escala).
+        found: Boolean(record),
         teamName: record?.teamName || '',
         inPosition: Boolean(record?.inPosition),
         // Sem registro na Fonia não há como saber escada/conveyor: sem sinal.

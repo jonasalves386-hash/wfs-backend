@@ -242,3 +242,12 @@ test('equipe TRASLADO não trava o voo no painel', async () => {
   const panel = await createPanelService(providers, silent).getPanelFlights(NOW);
   assert.deepEqual(panel.map((flight) => flight.id), ['alfa']);
 });
+
+test('voo sem registro na Fonia (ex.: cancelado lá) não trava o painel', async () => {
+  const providers = {
+    malha: { getArrivals: async () => [arrival('sumiu', 'LA3524', -40, { chocksOn: true }), arrival('futuro', 'LA21', 10)] },
+    fonia: providerReturning({ '2026-10-01': [record({ voo: '21' })] }),
+  };
+  const panel = await createPanelService(providers, silent).getPanelFlights(NOW);
+  assert.deepEqual(panel.map((flight) => flight.id), ['futuro']);
+});

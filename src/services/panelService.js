@@ -20,6 +20,9 @@ function mapBy(items, key) {
 //   só com a trava de equipamentos ligada (EQUIPMENT_HOLD=on). Desligada, as
 //   linhas ESCADA/CONVEYOR continuam alertando, mas não seguram o voo na tela.
 function holdsForFonia(assignment, flight, now, holdEquipment) {
+  // Só trava voo que a Fonia conhece: sem registro (ex.: cancelado na Fonia)
+  // o voo segue a regra normal e sai pelo ETA/calço/porta.
+  if (!assignment || assignment.found === false) return false;
   if (/^TRASLADO\b/i.test(String(assignment?.teamName || '').trim())) return false;
   if (!assignment?.inPosition) return true;
   return holdEquipment
